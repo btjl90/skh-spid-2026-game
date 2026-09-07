@@ -1,0 +1,1 @@
+gh issue list --repo other-org/other-repo --state open

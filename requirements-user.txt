@@ -1,0 +1,20 @@
+# loom dev-container distribution source (py) — generated INTO consumer templates by /sync-to-use; do not hand-edit the consumer copy. Registry host/org are ecosystem-relative, substituted at /sync-to-use distribution.
+# Project-owned Python dependencies — YOURS, never overwritten by /sync.
+#
+# Add the extra pip packages your project needs, one per line (pip requirement syntax).
+# On the next container launch — or right now via:
+#
+#     docker compose exec dev .devcontainer/postCreate.sh
+#
+# they install into the SAME shared venv (/opt/venv) the base uses, with NO image rebuild.
+#
+# Example:
+#   httpx>=0.27
+#   pandas>=2.2
+#
+# ── ML / Align frameworks (kailash-ml, kailash-align) ──────────────────────────────
+# These are torch-class (multi-GB) and are NOT in the base image. If `import kailash_ml`
+# (or `import kailash_align`) fails, enable them ONE of two ways:
+#   (a) the opt-in ML overlay:  docker compose exec dev .devcontainer/postCreate.sh --ml
+#       (installs requirements-coc-ml.txt — the pinned, template-owned ML set), OR
+#   (b) add the package(s) below yourself, e.g.  kailash-ml>=1.7  /  kailash-align>=0.7

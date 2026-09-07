@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+# loom dev-container distribution source (py) — generated INTO consumer templates by /sync-to-use; do not hand-edit the consumer copy. Registry host/org are ecosystem-relative, substituted at /sync-to-use distribution.
+# Kailash COC dev environment — one-command launch. Template-owned, regenerated on /sync.
+# `./bin/dev`            → drop into a shell in the dev container (ephemeral, --rm)
+# `./bin/dev <cmd...>`   → run <cmd> in the dev container
+# DB services (postgres/mysql) are separate: `docker compose --profile db up -d`.
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$repo_root"
+
+# S4 — a missing .env must produce a clear, actionable error, not a cryptic failure.
+if [ ! -f .env ]; then
+  cat >&2 <<'MSG'
+No .env found. The dev container reads your API keys from .env at runtime.
+
+    cp .env.example .env
+
+Then fill in ANTHROPIC_API_KEY / OPENAI_API_KEY / GOOGLE_API_KEY (and GH_TOKEN for
+GitHub access). Re-run ./bin/dev once .env exists.
+MSG
+  exit 1
+fi
+
+# Default to an interactive shell when no command is given.
+if [ "$#" -eq 0 ]; then set -- bash; fi
+
+# Pre-flight: resolve the dev image. Defaults to the published registry tag; honors
+# DEV_IMAGE override from .env (e.g. for template developers rebuilding the recipe).
+# shellcheck disable=SC1091
+[ -f .env ] && set -a && . ./.env && set +a
+DEV_IMAGE="${DEV_IMAGE:-docker.io/terrenefoundation/kailash-coc-py:1.10.1}"
+
+# Pre-flight: pull the published image when not present locally, with a clear error
+# on network/registry failure. Template developers using a local-build tag (no `/` in
+# the image name, or DEV_IMAGE=kailash-coc-dev:local) skip the pull pre-flight — they
+# are expected to have run `docker compose build dev` first.
+if [[ "$DEV_IMAGE" == *"/"* ]] && [[ "$DEV_IMAGE" != *":local"* ]]; then
+  if ! docker image inspect "$DEV_IMAGE" >/dev/null 2>&1; then
+    echo ">> first run: pulling $DEV_IMAGE from registry (one-time)…" >&2
+    if ! docker pull "$DEV_IMAGE"; then
+      cat >&2 <<MSG
+ERROR: failed to pull $DEV_IMAGE from Docker Hub.
+
+Likely causes:
+  - No network connectivity to docker.io
+  - Docker Hub is unreachable (outage, firewall, proxy)
+  - The image tag does not yet exist on the registry (publish workflow has not run)
+
+If you are iterating on the publisher recipe locally, set DEV_IMAGE=kailash-coc-dev:local
+in .env and uncomment the build: block in docker-compose.yml.
+MSG
+      exit 1
+    fi
+  fi
+fi
+
+# UID/GID align the container user to the host on Linux so bind-mounted files stay
+# host-owned (macOS Docker Desktop remaps transparently — harmless there).
+exec env UID="$(id -u)" GID="$(id -g)" DEV_IMAGE="$DEV_IMAGE" \
+  docker compose run --rm --service-ports dev "$@"

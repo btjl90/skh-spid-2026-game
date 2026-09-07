@@ -1,0 +1,183 @@
+name: Publish Dev Container Image
+
+# loom dev-container distribution source (py) — generated INTO consumer templates by /sync-to-use; do not hand-edit the consumer copy. Registry host/org are ecosystem-relative, substituted at /sync-to-use distribution.
+# Architecture B (2026-05-28 pivot, journal/0003): the dev container distributes as a
+# publisher-built image on the ecosystem registry (`docker.io/terrenefoundation/kailash-coc-py`).
+# Consumers `docker pull`; they do not build the Dockerfile locally on first run.
+#
+# Triggers:
+#   - git tag v<X.Y.Z> push      → build + push :<X.Y.Z> and :latest, multi-arch.
+#   - manual workflow_dispatch    → publish-with-explicit-tag operator override.
+#
+# Outputs (per `specs/dev-container-image.md` § Image acquisition + I10):
+#   - docker.io/terrenefoundation/kailash-coc-py:<X.Y.Z>   (immutable, semver tag)
+#   - docker.io/terrenefoundation/kailash-coc-py:latest    (moving pointer)
+#   - manifest digest sha256:…                          (captured as job output + release artifact)
+
+on:
+  push:
+    tags: ["v[0-9]+.[0-9]+.[0-9]+*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Image tag to publish (e.g. 0.1.0). REQUIRED on manual dispatch."
+        required: true
+        type: string
+      push_latest:
+        description: "Also update :latest pointer."
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-dev-image-${{ github.ref }}
+  cancel-in-progress: false # publishes are not safely cancellable mid-push
+
+jobs:
+  publish:
+    name: buildx + push (multi-arch)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    outputs:
+      tag: ${{ steps.resolve.outputs.tag }}
+      digest: ${{ steps.build.outputs.digest }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Resolve tag
+        id: resolve
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "push" ]; then
+            # strip the leading 'v' from v<X.Y.Z>
+            TAG="${GITHUB_REF_NAME#v}"
+          else
+            TAG="${{ inputs.tag }}"
+          fi
+          if [ -z "$TAG" ]; then
+            echo "::error::Empty tag — provide one via tag push or workflow_dispatch input." >&2
+            exit 1
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Resolved publish tag: $TAG"
+
+      - name: Set up QEMU (multi-arch emulation)
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to the ecosystem registry
+        uses: docker/login-action@v3
+        with:
+          # docker/login-action defaults to docker.io when `registry:` is omitted;
+          # the pull pointers carry docker.io, so the publish login MUST
+          # target the same host or fork pull/push split across registries.
+          registry: docker.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Compute tag list
+        id: tags
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.resolve.outputs.tag }}"
+          TAGS="docker.io/terrenefoundation/kailash-coc-py:${TAG}"
+          if [ "${{ github.event_name }}" = "push" ] || [ "${{ inputs.push_latest }}" = "true" ]; then
+            TAGS="${TAGS},docker.io/terrenefoundation/kailash-coc-py:latest"
+          fi
+          {
+            echo "tags<<EOF"
+            echo "$TAGS"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build and push (linux/amd64 + linux/arm64)
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.tags.outputs.tags }}
+          provenance: true
+          sbom: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ steps.resolve.outputs.tag }}
+            org.opencontainers.image.licenses=Apache-2.0
+
+      - name: Record manifest digest
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.resolve.outputs.tag }}"
+          DIGEST="${{ steps.build.outputs.digest }}"
+          echo "Published docker.io/terrenefoundation/kailash-coc-py:${TAG}"
+          echo "Manifest digest: ${DIGEST}"
+          mkdir -p artifacts
+          {
+            echo "tag: ${TAG}"
+            echo "digest: ${DIGEST}"
+            echo "ref: ${{ github.ref }}"
+            echo "sha: ${{ github.sha }}"
+            echo "platforms: linux/amd64,linux/arm64"
+          } > artifacts/manifest-${TAG}.txt
+
+      - name: Upload digest artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: image-manifest-${{ steps.resolve.outputs.tag }}
+          path: artifacts/manifest-${{ steps.resolve.outputs.tag }}.txt
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Verify multi-arch manifest (post-push)
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.resolve.outputs.tag }}"
+          # Surface the platforms the registry now serves under this tag.
+          docker buildx imagetools inspect "docker.io/terrenefoundation/kailash-coc-py:${TAG}" | tee /tmp/manifest.txt
+          # Fail loudly if the published manifest is single-arch (regression guard).
+          grep -q "linux/amd64" /tmp/manifest.txt
+          grep -q "linux/arm64" /tmp/manifest.txt
+
+      - name: Sync Docker Hub overview (README + short description)
+        # Only on releases that also update :latest — keeps the public README in
+        # lockstep with the stable tag, NOT every pre-release / hotfix re-push.
+        # Same condition that fed :latest into the tag list at the "Compute tag
+        # list" step above.
+        # NB: workflow_dispatch's push_latest input is declared as type: boolean.
+        # In Actions expression context, comparing a boolean to the string 'true'
+        # fails type-coercion and the step silently skips. Use the bare input
+        # (truthy evaluation) instead — matches the bash-side check in "Compute
+        # tag list" that interpolates the boolean as the string "true" inside a
+        # shell test. Fix landed 2026-05-31 after the v1.10.1 publish landed the
+        # image+:latest but skipped this Overview-sync step.
+        #
+        # ECOSYSTEM-RELATIVE: peter-evans/dockerhub-description talks ONLY to the
+        # Docker Hub overview API, and its `repository:` input is a Docker Hub
+        # `org/repo` slug (NOT a host-prefixed pointer — prefixing docker.io
+        # would make the action reject the slug). So this ancillary step is gated to
+        # the canon Docker Hub registry: on an ecosystem fork whose docker.io
+        # is NOT docker.io (e.g. ghcr.io / a private registry) there is no Docker Hub
+        # overview to sync, and the step is a no-op. The HOST-bearing publish path
+        # (login + push + inspect above) is fully docker.io-parameterized, so
+        # the published and pulled image always share one registry on every ecosystem.
+        if: ${{ (github.event_name == 'push' || inputs.push_latest) && 'docker.io' == 'docker.io' }}
+        uses: peter-evans/dockerhub-description@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          repository: terrenefoundation/kailash-coc-py
+          short-description: "Reproducible multi-CLI dev container for the Kailash Python SDK (claude/codex/gemini, Apache 2.0)"
+          readme-filepath: ./DOCKERHUB.md
+          enable-url-completion: true

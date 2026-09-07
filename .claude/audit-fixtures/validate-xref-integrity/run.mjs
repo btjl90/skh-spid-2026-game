@@ -1,0 +1,1305 @@
+#!/usr/bin/env node
+/*
+ * Audit fixture runner for validate-xref-integrity (F22, journal/0150).
+ *
+ * Structural probes per rules/probe-driven-verification.md MUST-3:
+ *   - exit-code / count-of-elements / equality checks on pure-function outputs.
+ *   - NO semantic judgment, NO regex on assistant prose.
+ *
+ * Exit 0 = all fixtures pass. Exit 1 = ≥1 fixture failed.
+ */
+
+import {
+  extractTokens,
+  resolveJournalToken,
+  resolveRefToken,
+  resolveOne,
+  stripFencedBlocks,
+  isPlaceholder,
+  isCrossCliDispatcher,
+  hasFileExtension,
+  isSanctionedAbsentRef,
+  isSanctionedDeferredFixture,
+  computeBlockTexts,
+  findRepoRoot,
+  targetDisposition,
+  toManifestRelpath,
+  isDeclaredXrefAbsent,
+  loadXrefAbsentDeclaration,
+  DEFAULT_SCOPE_DIRS,
+} from "../../bin/validate-xref-integrity.mjs";
+import { writeFileSync, mkdirSync, rmSync, existsSync, mkdtempSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+
+const REPO_ROOT = findRepoRoot(process.cwd());
+
+let passed = 0;
+let failed = 0;
+
+function check(name, condition, details) {
+  if (condition) {
+    passed++;
+    process.stdout.write(`  PASS  ${name}\n`);
+  } else {
+    failed++;
+    process.stderr.write(`  FAIL  ${name}\n`);
+    if (details) process.stderr.write(`        ${details}\n`);
+  }
+}
+
+// ------------------------------------------------------------------
+// fixture-01-backtick-extract
+// ------------------------------------------------------------------
+{
+  const text = "see `rules/foo.md` and `.claude/rules/bar.md` plus `<id>` literal";
+  const findings = extractTokens(text, "test.md");
+  const tokens = findings.map((f) => f.token).sort();
+  check(
+    "fixture-01-backtick-extract",
+    tokens.length === 2 &&
+      tokens.includes("rules/foo.md") &&
+      tokens.includes(".claude/rules/bar.md"),
+    `got tokens=${JSON.stringify(tokens)}`,
+  );
+}
+
+// ------------------------------------------------------------------
+// fixture-02-md-link-extract
+// ------------------------------------------------------------------
+{
+  const text =
+    "[a](rules/foo.md) [b](https://x.com/x.md) [c](#frag) [d](skills/x/y.md#anchor)";
+  const findings = extractTokens(text, "test.md");
+  const tokens = findings.map((f) => f.token).sort();
+  check(
+    "fixture-02-md-link-extract",
+    tokens.length === 2 &&
+      tokens.includes("rules/foo.md") &&
+      tokens.includes("skills/x/y.md"),
+    `got tokens=${JSON.stringify(tokens)}`,
+  );
+}
+
+// ------------------------------------------------------------------
+// fixture-03-journal-backtick
+// ------------------------------------------------------------------
+{
+  const text = "see `journal/0150-DECISION-foo.md` and `journal/.pending/0001-bar`";
+  const findings = extractTokens(text, "test.md");
+  const kinds = findings.map((f) => f.kind).sort();
+  const tokens = findings.map((f) => f.token).sort();
+  check(
+    "fixture-03-journal-backtick",
+    findings.length === 2 &&
+      kinds[0] === "journal" &&
+      kinds[1] === "journal" &&
+      tokens[0] === "journal/.pending/0001-bar" &&
+      tokens[1] === "journal/0150-DECISION-foo.md",
+    `got findings=${JSON.stringify(findings.map((f) => ({ k: f.kind, t: f.token })))}`,
+  );
+}
+
+// ------------------------------------------------------------------
+// fixture-04-fence-strip
+// ------------------------------------------------------------------
+{
+  const text = [
+    "see `rules/outside.md`",
+    "```",
+    "this `rules/inside-fence.md` is illustrative",
+    "```",
+    "and `rules/after-fence.md`",
+  ].join("\n");
+  const findings = extractTokens(text, "test.md");
+  const tokens = findings.map((f) => f.token).sort();
+  check(
+    "fixture-04-fence-strip",
+    tokens.length === 2 &&
+      tokens.includes("rules/outside.md") &&
+      tokens.includes("rules/after-fence.md") &&
+      !tokens.includes("rules/inside-fence.md"),
+    `got tokens=${JSON.stringify(tokens)}`,
+  );
+}
+
+// ------------------------------------------------------------------
+// fixture-04b-fence-run-length
+// ------------------------------------------------------------------
+// A 4-backtick fence whose body contains a 3-backtick fence. CommonMark
+// closes a fence only on a run of the SAME character that is AT LEAST as
+// long as the opener, so every line below between the ```` markers is
+// fenced content and none of its tokens may be extracted.
+//
+// The discriminating token is `rules/between-inner.md`. A stripper that
+// compares only the fence CHARACTER treats the first inner ``` as a close,
+// which re-opens scanning mid-block and leaks that one token — while
+// `rules/inner-a.md` and `rules/inner-b.md` stay blanked either way. So the
+// leak is a parity FLIP, not uniform: a case asserting only "inner tokens
+// are absent" passes under BOTH implementations and cannot discriminate.
+{
+  const text = [
+    "see `rules/outside.md`",
+    "````",
+    "this `rules/inner-a.md` is illustrative",
+    "```",
+    "this `rules/between-inner.md` is ALSO illustrative",
+    "```",
+    "this `rules/inner-b.md` is illustrative",
+    "````",
+    "and `rules/after.md`",
+  ].join("\n");
+  const findings = extractTokens(text, "test.md");
+  const tokens = findings.map((f) => f.token).sort();
+  check(
+    "fixture-04b-fence-run-length",
+    tokens.length === 2 &&
+      tokens.includes("rules/outside.md") &&
+      tokens.includes("rules/after.md") &&
+      !tokens.includes("rules/between-inner.md"),
+    `got tokens=${JSON.stringify(tokens)}`,
+  );
+}
+
+// ------------------------------------------------------------------
+// fixture-05-md-link-relative-resolve
+// ------------------------------------------------------------------
+// Build a temp tree: <tmp>/source-dir/source.md links to ../sibling/target.md
+// at <tmp>/sibling/target.md. Resolver must match.
+{
+  const tmp = mkdtempSync(join(tmpdir(), "xref-fix-05-"));
+  try {
+    mkdirSync(join(tmp, "source-dir"), { recursive: true });
+    mkdirSync(join(tmp, "sibling"), { recursive: true });
+    writeFileSync(join(tmp, "sibling", "target.md"), "# target\n");
+    writeFileSync(join(tmp, "source-dir", "source.md"), "[t](../sibling/target.md)\n");
+
+    // Use resolveRefToken directly with kind="md-link" + source-relative path
+    const result = resolveRefToken(
+      "../sibling/target.md",
+      tmp,
+      "source-dir/source.md",
+      "md-link",
+    );
+    check(
+      "fixture-05-md-link-relative-resolve",
+      result.ok === true,
+      `got result=${JSON.stringify(result)}`,
+    );
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+}
+
+// ------------------------------------------------------------------
+// fixture-06-placeholder-reject
+// ------------------------------------------------------------------
+{
+  check(
+    "fixture-06-placeholder-reject",
+    isPlaceholder("<id>") &&
+      isPlaceholder("<NNNN>") &&
+      isPlaceholder("{topic}") &&
+      !isPlaceholder("rules/foo.md") &&
+      !isPlaceholder("skills/x/y.md"),
+    `placeholder detection broken`,
+  );
+}
+
+// ------------------------------------------------------------------
+// fixture-07-dir-token-vs-file
+// ------------------------------------------------------------------
+{
+  const tmp = mkdtempSync(join(tmpdir(), "xref-fix-07-"));
+  try {
+    mkdirSync(join(tmp, ".claude", "audit-fixtures", "alpha"), { recursive: true });
+    mkdirSync(join(tmp, ".claude", "rules"), { recursive: true });
+    writeFileSync(join(tmp, ".claude", "audit-fixtures", "alpha", "README.md"), "# x");
+    writeFileSync(join(tmp, ".claude", "rules", "alpha.md"), "# y");
+
+    // Dir token with trailing /
+    const r1 = resolveRefToken(
+      "audit-fixtures/alpha/",
+      tmp,
+      null,
+      "backtick",
+    );
+    // File token without trailing /
+    const r2 = resolveRefToken("rules/alpha.md", tmp, null, "backtick");
+    // File token WITH trailing slash → should fail (file, not dir)
+    const r3 = resolveRefToken("rules/alpha.md/", tmp, null, "backtick");
+    check(
+      "fixture-07-dir-token-vs-file",
+      r1.ok === true && r2.ok === true && r3.ok === false,
+      `r1=${r1.ok} r2=${r2.ok} r3=${r3.ok}`,
+    );
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+}
+
+// ------------------------------------------------------------------
+// fixture-08-claude-prefix
+// ------------------------------------------------------------------
+{
+  const tmp = mkdtempSync(join(tmpdir(), "xref-fix-08-"));
+  try {
+    mkdirSync(join(tmp, ".claude", "rules"), { recursive: true });
+    writeFileSync(join(tmp, ".claude", "rules", "x.md"), "# x");
+    const r = resolveRefToken(".claude/rules/x.md", tmp, null, "backtick");
+    check(
+      "fixture-08-claude-prefix",
+      r.ok === true,
+      `got r=${JSON.stringify(r)}`,
+    );
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+}
+
+// ------------------------------------------------------------------
+// fixture-09-bare-prefix-tries-claude-first
+// ------------------------------------------------------------------
+// `rules/x.md` should resolve to `<repo>/.claude/rules/x.md` when only
+// the .claude/-prefixed variant exists.
+{
+  const tmp = mkdtempSync(join(tmpdir(), "xref-fix-09-"));
+  try {
+    mkdirSync(join(tmp, ".claude", "rules"), { recursive: true });
+    writeFileSync(join(tmp, ".claude", "rules", "x.md"), "# x");
+    // bare-prefix form (no leading .claude/)
+    const r = resolveRefToken("rules/x.md", tmp, null, "backtick");
+    check(
+      "fixture-09-bare-prefix-tries-claude-first",
+      r.ok === true && r.resolvedPath && r.resolvedPath.endsWith(".claude/rules/x.md"),
+      `got r=${JSON.stringify(r)}`,
+    );
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+}
+
+// ------------------------------------------------------------------
+// fixture-10-journal-resolve-prefix
+// ------------------------------------------------------------------
+// Build a temp journal dir with `0150-DECISION-foo.md`; resolveJournalToken
+// for `journal/0150` MUST match (NNNN-prefix glob), and `journal/9999` MUST NOT.
+{
+  const tmp = mkdtempSync(join(tmpdir(), "xref-fix-10-"));
+  try {
+    mkdirSync(join(tmp, "journal"), { recursive: true });
+    writeFileSync(join(tmp, "journal", "0150-DECISION-foo.md"), "# foo");
+    const hit = resolveJournalToken("journal/0150", tmp);
+    const miss = resolveJournalToken("journal/9999", tmp);
+    check(
+      "fixture-10-journal-resolve-prefix",
+      hit.ok === true && miss.ok === false && miss.reason === "journal-entry-not-found",
+      `hit=${JSON.stringify(hit)} miss=${JSON.stringify(miss)}`,
+    );
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+}
+
+// ------------------------------------------------------------------
+// fixture-11-anchor-stripping
+// ------------------------------------------------------------------
+// `journal/0150-foo.md#section` extracts token `journal/0150-foo.md` (the
+// regex char-class excludes `#`); the section anchor is NOT verified per
+// Phase-1 exclusion. Pinned to prevent regex drift in future edits.
+{
+  const text = "see `journal/0150-foo.md` and `journal/0150-foo` and [x](rules/foo.md#section)";
+  const findings = extractTokens(text, "test.md");
+  const tokens = findings.map((f) => f.token).sort();
+  check(
+    "fixture-11-anchor-stripping",
+    tokens.length === 3 &&
+      tokens.includes("journal/0150-foo.md") &&
+      tokens.includes("journal/0150-foo") &&
+      tokens.includes("rules/foo.md") && // md-link strips the `#section` anchor
+      !tokens.some((t) => t.includes("#")),
+    `got tokens=${JSON.stringify(tokens)}`,
+  );
+}
+
+// ------------------------------------------------------------------
+// fixture-12-crlf-line-endings
+// ------------------------------------------------------------------
+// split(/\r?\n/) handles CRLF; verify no token corruption.
+{
+  const text = "first line `rules/a.md`\r\nsecond line `rules/b.md`\r\n";
+  const findings = extractTokens(text, "test.md");
+  const tokens = findings.map((f) => f.token).sort();
+  const lines = findings.map((f) => f.line).sort();
+  check(
+    "fixture-12-crlf-line-endings",
+    tokens.length === 2 &&
+      tokens.includes("rules/a.md") &&
+      tokens.includes("rules/b.md") &&
+      lines[0] === 1 &&
+      lines[1] === 2,
+    `got tokens=${JSON.stringify(tokens)} lines=${JSON.stringify(lines)}`,
+  );
+}
+
+// ------------------------------------------------------------------
+// fixture-13-tilde-fence
+// ------------------------------------------------------------------
+// `~~~` fences are stripped exactly like ` ``` ` fences.
+{
+  const text = [
+    "see `rules/outside.md`",
+    "~~~",
+    "this `rules/inside-tilde.md` is illustrative",
+    "~~~",
+    "and `rules/after-tilde.md`",
+  ].join("\n");
+  const findings = extractTokens(text, "test.md");
+  const tokens = findings.map((f) => f.token).sort();
+  check(
+    "fixture-13-tilde-fence",
+    tokens.length === 2 &&
+      tokens.includes("rules/outside.md") &&
+      tokens.includes("rules/after-tilde.md") &&
+      !tokens.includes("rules/inside-tilde.md"),
+    `got tokens=${JSON.stringify(tokens)}`,
+  );
+}
+
+// ------------------------------------------------------------------
+// fixture-14-path-traversal-guard
+// ------------------------------------------------------------------
+// Malicious md-link token MUST NOT resolve to a path outside repoRoot
+// (security-reviewer MEDIUM-1 — `isInsideRepoRoot`).
+//
+// THE EARLIER VERSION OF THIS FIXTURE COULD NOT FAIL, and the way it could not
+// is worth stating because it is the failure mode the whole validator exists to
+// catch. It asserted `not-found` for `../../../../../etc/passwd` resolved from a
+// tree under `os.tmpdir()`. On macOS `tmpdir()` is `/var/folders/<a>/<b>/T/...`,
+// so five `..` hops land on `/var/folders/etc/passwd` — a path that does not
+// exist. The assertion therefore held for the WRONG REASON: the traversal target
+// was absent, not clamped. Deleting `isInsideRepoRoot`'s guard entirely left the
+// fixture GREEN (measured: mutation `isInsideRepoRoot -> return true` executed 23
+// times during this suite and reddened nothing). The outcome was constant across
+// both branches of the hypothesis, which is `instrument-discipline.md` MUST-1.
+//
+// The repair makes the escape target REAL and tmpdir-shape-independent: a file
+// is planted at a known relative distance outside the root, its existence is
+// asserted (so `not-found` can only mean "clamped"), and a POSITIVE CONTROL
+// resolves an INSIDE token through the same resolver on the same tree — so a
+// resolver that refused everything could not pass either.
+{
+  const tmp = mkdtempSync(join(tmpdir(), "xref-fix-14-"));
+  try {
+    const root = join(tmp, "root");
+    mkdirSync(join(root, "source-dir"), { recursive: true });
+    writeFileSync(join(root, "source-dir", "source.md"), "source");
+    writeFileSync(join(root, "source-dir", "sibling.md"), "inside the root");
+    // A REAL file one level ABOVE the repo root.
+    mkdirSync(join(tmp, "outside"), { recursive: true });
+    const escapeTarget = join(tmp, "outside", "secret.md");
+    writeFileSync(escapeTarget, "OUTSIDE THE ROOT");
+
+    // Precondition, asserted rather than assumed: without the guard this token
+    // resolves onto a file that is really there.
+    const targetExists = existsSync(escapeTarget);
+
+    const escaping = resolveRefToken(
+      "../../outside/secret.md",
+      root,
+      "source-dir/source.md",
+      "md-link",
+    );
+    // POSITIVE CONTROL — same resolver, same tree, a token that stays inside.
+    const inside = resolveRefToken(
+      "./sibling.md",
+      root,
+      "source-dir/source.md",
+      "md-link",
+    );
+
+    check(
+      "fixture-14-path-traversal-guard",
+      targetExists === true &&
+        inside.ok === true &&
+        escaping.ok === false &&
+        escaping.reason === "not-found",
+      `targetExists=${targetExists} inside=${JSON.stringify(inside)} escaping=${JSON.stringify(escaping)}`,
+    );
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+}
+
+// ------------------------------------------------------------------
+// fixture-15-extended-placeholders
+// ------------------------------------------------------------------
+// Reviewer MEDIUM-4: isPlaceholder also rejects ${VAR}, %(var)s forms.
+{
+  check(
+    "fixture-15-extended-placeholders",
+    isPlaceholder("${API_KEY}") &&
+      isPlaceholder("%(var)s") &&
+      isPlaceholder("rules/${NAME}.md") &&
+      !isPlaceholder("rules/foo.md") &&
+      !isPlaceholder("skills/percent-100.md"),
+    `placeholder extension broken`,
+  );
+}
+
+// ------------------------------------------------------------------
+// fixture-16-cross-cli-dispatcher (FC, journal/0186)
+// ------------------------------------------------------------------
+// isCrossCliDispatcher skips the Codex dispatcher token family bin/coc /
+// bin/coc-<phase> (anchored ^bin/coc(-[a-z0-9-]+)?$) and NOTHING ELSE.
+{
+  check(
+    "fixture-16-cross-cli-dispatcher",
+    isCrossCliDispatcher("bin/coc") === true &&
+      isCrossCliDispatcher("bin/coc-analyze") === true &&
+      isCrossCliDispatcher("bin/cocktail.mjs") === false &&
+      isCrossCliDispatcher("bin/codex.mjs") === false &&
+      isCrossCliDispatcher("bin/coc.mjs") === false &&
+      isCrossCliDispatcher("bin/emit.mjs") === false,
+    `cross-cli dispatcher token classification broken`,
+  );
+}
+
+// ------------------------------------------------------------------
+// fixture-17-default-scope-excludes-audit-fixtures (FC, journal/0186)
+// ------------------------------------------------------------------
+// audit-fixtures/ is NOT a default SCAN SOURCE (synthetic test corpora);
+// still reachable via explicit --scope. The other four trees stay in default.
+{
+  check(
+    "fixture-17-default-scope-excludes-audit-fixtures",
+    !DEFAULT_SCOPE_DIRS.some((d) => d.includes("audit-fixtures")) &&
+      DEFAULT_SCOPE_DIRS.includes(".claude/rules") &&
+      DEFAULT_SCOPE_DIRS.includes(".claude/skills") &&
+      DEFAULT_SCOPE_DIRS.includes(".claude/commands") &&
+      DEFAULT_SCOPE_DIRS.includes(".claude/agents"),
+    `DEFAULT_SCOPE_DIRS scope set incorrect`,
+  );
+}
+
+// ------------------------------------------------------------------
+// fixture-18-slashless-token-naming-directory-resolves-labelled
+// ------------------------------------------------------------------
+// A bare token naming a real DIRECTORY (`skills/45-genesis-bootstrap`) must
+// RESOLVE, not report not-found — `isDir` is inferred from the token's
+// trailing slash, never from disk. The match is LABELLED so it stays visible.
+{
+  const tmp = mkdtempSync(join(tmpdir(), "xref-fix-18-"));
+  try {
+    mkdirSync(join(tmp, ".claude", "skills", "45-genesis-bootstrap"), { recursive: true });
+    const result = resolveRefToken("skills/45-genesis-bootstrap", tmp, "a.md", "backtick");
+    check(
+      "fixture-18-slashless-token-naming-directory-resolves-labelled",
+      result.ok === true && result.looseDirMatch === true,
+      `got result=${JSON.stringify(result)}`,
+    );
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+}
+
+// ------------------------------------------------------------------
+// fixture-19-file-wins-over-directory-no-loose-label
+// ------------------------------------------------------------------
+// THE tightness property. Candidate order for a bare token puts `.claude/<t>`
+// FIRST and `<root>/<t>` second. With a DIRECTORY at the first candidate and a
+// FILE at the second, the FILE must win and the result must carry NO loose
+// label — proving the directory fallback is a second pass, not a relaxed
+// predicate that would let a same-named directory satisfy a file reference.
+{
+  const tmp = mkdtempSync(join(tmpdir(), "xref-fix-19-"));
+  try {
+    mkdirSync(join(tmp, ".claude", "thing"), { recursive: true }); // directory, first candidate
+    writeFileSync(join(tmp, "thing"), "real file\n"); // file, second candidate
+    const result = resolveRefToken("thing", tmp, "a.md", "backtick");
+    check(
+      "fixture-19-file-wins-over-directory-no-loose-label",
+      result.ok === true &&
+        result.looseDirMatch !== true &&
+        result.resolvedPath === join(tmp, "thing"),
+      `got result=${JSON.stringify(result)}`,
+    );
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+}
+
+// ------------------------------------------------------------------
+// fixture-20-trailing-slash-token-resolves-strictly-unlabelled
+// ------------------------------------------------------------------
+// An explicit-directory token skips a FILE at candidate-1 and resolves at the
+// DIRECTORY at candidate-2 — carrying NO loose label, because the strict first
+// pass matched it. Pins two things the slash-less fallback must not disturb:
+// the trailing-slash form is type-checked, and its match is not mislabelled.
+//
+// This fixture REPLACES an earlier `fixture-20-trailing-slash-token-still-strict`
+// that asserted a FILE at a trailing-slash path stays not-found. That assertion
+// held for a reason OUTSIDE the validator: `join()` preserves the trailing slash,
+// and lstat("<path>/") on a file is rejected by the KERNEL with ENOTDIR before any
+// predicate runs. It therefore survived every mutation of the logic it claimed to
+// pin — a check that could not discriminate.
+//
+// Note on the `!isDir` conjunct guarding the second pass: it is provably INERT
+// (that pass's predicate is a subset of pass 1's over the same candidate list),
+// so NO fixture can pin it — widening it to `true` changes 0 of 486 disk-config ×
+// token-shape × kind rows, on a harness that reports 32 differing rows when the
+// pass is disabled. (32 is the control for the CURRENT, extension-bounded code;
+// it was 48 pre-bound, and an earlier revision of this note quoted that figure.)
+// It is kept as documented defense-in-depth, not as covered logic. See the second
+// pass in validate-xref-integrity.mjs.
+//
+// Discriminating (both verified by mutation):
+//   - pass-1 predicate `isDir ? st.isDirectory() : st.isFile()` → `st.isFile()`
+//     ⇒ RED (not-found: the directory no longer satisfies the token)
+//   - `const isDir = token.endsWith("/")` → `false`
+//     ⇒ RED (resolves via the fallback and arrives WITH looseDirMatch)
+{
+  const tmp = mkdtempSync(join(tmpdir(), "xref-fix-20-"));
+  try {
+    mkdirSync(join(tmp, ".claude"), { recursive: true });
+    writeFileSync(join(tmp, ".claude", "x"), "file at candidate-1\n");
+    mkdirSync(join(tmp, "x"), { recursive: true }); // directory at candidate-2
+    const result = resolveRefToken("x/", tmp, "a.md", "backtick");
+    check(
+      "fixture-20-trailing-slash-token-resolves-strictly-unlabelled",
+      result.ok === true &&
+        result.looseDirMatch !== true &&
+        String(result.resolvedPath).replace(/\/+$/, "") === join(tmp, "x"),
+      `got result=${JSON.stringify(result)}`,
+    );
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+}
+
+// ------------------------------------------------------------------
+// fixture-21-absent-by-design-skipped-only-in-declared-source
+// ------------------------------------------------------------------
+// The absent-by-design allowlist is SOURCE-SCOPED: sanctioned in the file whose
+// prose establishes the token, still dangling anywhere else. Both polarities,
+// so the carve-out can never decay into blanket token suppression.
+{
+  const declared = {
+    kind: "backtick",
+    token: "bin/dev",
+    source: ".claude/skills/10-deployment-git/docker-dev-env-patterns.md",
+  };
+  const undeclared = { kind: "backtick", token: "bin/dev", source: ".claude/rules/zero-tolerance.md" };
+  check(
+    "fixture-21-absent-by-design-skipped-only-in-declared-source",
+    isSanctionedAbsentRef(declared) === true && isSanctionedAbsentRef(undeclared) === false,
+    `declared=${isSanctionedAbsentRef(declared)} undeclared=${isSanctionedAbsentRef(undeclared)}`,
+  );
+}
+
+// ------------------------------------------------------------------
+// fixture-22-absent-by-design-unknown-token-not-sanctioned
+// ------------------------------------------------------------------
+// A token absent from the allowlist is never sanctioned, even from a file that
+// legitimately carries other carve-outs.
+{
+  const other = {
+    kind: "backtick",
+    token: "bin/definitely-not-allowlisted",
+    source: ".claude/skills/10-deployment-git/docker-dev-env-patterns.md",
+  };
+  check(
+    "fixture-22-absent-by-design-unknown-token-not-sanctioned",
+    isSanctionedAbsentRef(other) === false,
+    `got ${isSanctionedAbsentRef(other)}`,
+  );
+}
+
+// ------------------------------------------------------------------
+// fixture-23-extension-bearing-token-not-satisfied-by-directory
+// ------------------------------------------------------------------
+// The slash-less directory fallback is bounded to EXTENSION-LESS tokens. A token
+// written `ghost.md` states its type in its own name, so a DIRECTORY named
+// `ghost.md` must NOT retire it — it stays dangling and keeps driving the exit
+// code. Without the bound, a real dangling ref would go quiet the moment a
+// same-named directory appeared.
+//
+// BIPOLAR by construction: the extension-less arm must still resolve via the
+// fallback in the SAME tree, so a dead fallback cannot make the first arm pass
+// for the wrong reason.
+//
+// Discriminating: drop `!hasFileExtension(token)` from the second-pass condition
+// ⇒ RED (the `ghost.md` arm resolves with looseDirMatch instead of not-found).
+{
+  const tmp = mkdtempSync(join(tmpdir(), "xref-fix-23-"));
+  try {
+    mkdirSync(join(tmp, ".claude", "ghost.md"), { recursive: true }); // directory named like a file
+    mkdirSync(join(tmp, ".claude", "ghostdir"), { recursive: true }); // extension-less directory
+    const extBearing = resolveRefToken("ghost.md", tmp, "a.md", "backtick");
+    const extLess = resolveRefToken("ghostdir", tmp, "a.md", "backtick");
+    check(
+      "fixture-23-extension-bearing-token-not-satisfied-by-directory",
+      extBearing.ok === false &&
+        extBearing.reason === "not-found" &&
+        extLess.ok === true &&
+        extLess.looseDirMatch === true,
+      `extBearing=${JSON.stringify(extBearing)} extLess=${JSON.stringify(extLess)}`,
+    );
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+}
+
+// ------------------------------------------------------------------
+// fixture-24-file-extension-classifier
+// ------------------------------------------------------------------
+// The classifier the bound above rests on: a dot past position 0 in the LAST
+// path segment is an extension; a leading dot is not (`journal/.pending`,
+// `.claude`), and a dotless segment is extension-less. Pinned directly so the
+// bound cannot be silently widened by a regex/indexing tweak.
+{
+  check(
+    "fixture-24-file-extension-classifier",
+    hasFileExtension("rules/foo.md") === true &&
+      hasFileExtension("bin/x.mjs") === true &&
+      hasFileExtension("ghost.md") === true &&
+      hasFileExtension("skills/45-genesis-bootstrap") === false &&
+      hasFileExtension(".claude/hooks/lib") === false &&
+      hasFileExtension("journal/.pending") === false &&
+      hasFileExtension("audit-fixtures/exact-gate-tracking") === false,
+    `file-extension classifier broken`,
+  );
+}
+
+// ------------------------------------------------------------------
+// fixture-25-deferral-declaration-is-block-scoped-not-line-scoped
+// ------------------------------------------------------------------
+// A Trust-Posture-Wiring bullet is routinely HARD-WRAPPED, so the physical line
+// carrying the fixture token often does NOT carry the deferral declaration two
+// lines above it. A line-scoped guard therefore reported a legitimately
+// sanctioned reference as a dangling defect — a FALSE NEGATIVE that corrupts the
+// signal in the direction that hides real defects. Pinned against the real shape
+// (wave-loop.md's MUST-6/7 bullet), not a paraphrase.
+//
+// BIPOLAR: the same finding WITHOUT blockText (the old line-scoped view) must
+// still come back false, so a guard that sanctioned everything cannot pass this.
+{
+  const lines = [
+    "- **Detection mechanism:** Phase 1 (manual, gate-review) — reviewer inspects the",
+    "  transcript for an idle-wait window (MUST-6). Phase 2 (deferred per",
+    "  `rules/trust-posture.md` § Two-Phase Rollout): advisory Stop-event detector + audit fixtures at",
+    "  `.claude/audit-fixtures/wave-loop/orchestration-hygiene/` per `rules/cc-artifacts.md` Rule 9.",
+  ];
+  const blockOf = computeBlockTexts(lines);
+  const token = ".claude/audit-fixtures/wave-loop/orchestration-hygiene/";
+  const wrapped = {
+    kind: "backtick",
+    token,
+    lineText: lines[3],
+    blockText: blockOf[3],
+  };
+  const lineOnly = { kind: "backtick", token, lineText: lines[3] };
+  check(
+    "fixture-25-deferral-declaration-is-block-scoped-not-line-scoped",
+    isSanctionedDeferredFixture(wrapped) === true &&
+      isSanctionedDeferredFixture(lineOnly) === false,
+    `wrapped=${isSanctionedDeferredFixture(wrapped)} lineOnly=${isSanctionedDeferredFixture(lineOnly)}`,
+  );
+}
+
+// ------------------------------------------------------------------
+// fixture-26-deferral-declared-by-fixtures-land-with-phrasing
+// ------------------------------------------------------------------
+// hook-output-discipline.md MUST-5(a) declares its deferral in the cc-artifacts
+// Rule 9 phrasing ("Audit fixtures land WITH that check at …") and NEVER in the
+// literal `Phase 2 (deferred` form — while the SAME line contains the string
+// "Phase 2 is NOT deferred" for its sibling half. So the accepted second form
+// must key on the land-with phrasing; a regex widened to chase `Phase 2` near
+// `deferr` would match the DISCLAIMER and sanction the wrong thing.
+//
+// BIPOLAR: the disclaimer-only arm must NOT be accepted.
+{
+  const declaring =
+    "The (a) half is this clause's ONE genuine **Phase 2** deferral. " +
+    "Audit fixtures land WITH that check at `.claude/audit-fixtures/parsed-signal-detector/` " +
+    "per `cc-artifacts.md` Rule 9; no fixtures are claimed now.";
+  const disclaimerOnly =
+    "**Phase 2 is NOT deferred-pending-a-detector for the (b) half**, and this " +
+    "clause may not file one; see the audit fixtures discussion above.";
+  const token = ".claude/audit-fixtures/parsed-signal-detector/";
+  check(
+    "fixture-26-deferral-declared-by-fixtures-land-with-phrasing",
+    isSanctionedDeferredFixture({ kind: "backtick", token, blockText: declaring }) === true &&
+      isSanctionedDeferredFixture({ kind: "backtick", token, blockText: disclaimerOnly }) === false,
+    `declaring=${isSanctionedDeferredFixture({ kind: "backtick", token, blockText: declaring })} ` +
+      `disclaimerOnly=${isSanctionedDeferredFixture({ kind: "backtick", token, blockText: disclaimerOnly })}`,
+  );
+}
+
+// ------------------------------------------------------------------
+// fixture-27-positive-allowlist-remains-the-binding-constraint
+// ------------------------------------------------------------------
+// Widening HOW a deferral may be declared must not widen WHICH slugs may be
+// sanctioned. An UNLISTED slug stays dangling even under a perfect declaration
+// (otherwise a genuinely-missing fixture dir could hide behind the carve-out),
+// and a LISTED slug stays dangling without one. Both directions pinned.
+{
+  const perfect =
+    "Phase 2 (deferred per `trust-posture.md` § Two-Phase Rollout) — " +
+    "audit fixtures land with the Phase-2 detector at that path.";
+  const unlisted = isSanctionedDeferredFixture({
+    kind: "backtick",
+    token: ".claude/audit-fixtures/totally-made-up-slug/",
+    blockText: perfect,
+  });
+  const listedNoDeclaration = isSanctionedDeferredFixture({
+    kind: "backtick",
+    token: ".claude/audit-fixtures/path-containment/",
+    blockText: "see the fixtures directory for detail",
+  });
+  const listedWithDeclaration = isSanctionedDeferredFixture({
+    kind: "backtick",
+    token: ".claude/audit-fixtures/path-containment/",
+    blockText: perfect,
+  });
+  check(
+    "fixture-27-positive-allowlist-remains-the-binding-constraint",
+    unlisted === false && listedNoDeclaration === false && listedWithDeclaration === true,
+    `unlisted=${unlisted} listedNoDeclaration=${listedNoDeclaration} listedWithDeclaration=${listedWithDeclaration}`,
+  );
+}
+
+// ------------------------------------------------------------------
+// fixture-28-a-block-does-not-borrow-a-neighbouring-bullets-declaration
+// ------------------------------------------------------------------
+// Block-scoping widens the guard's view from one line to one bullet. It must NOT
+// widen it to the whole document: a token cited in a bullet that declares
+// nothing must stay dangling even when the ADJACENT bullet declares a deferral.
+// Both tokens here are on the allowlist, so only the block boundary separates
+// them — which is exactly the property under test.
+{
+  const lines = [
+    "- **Detection mechanism:** Phase 2 (deferred per rollout) — audit fixtures land",
+    "  with the detector at `.claude/audit-fixtures/path-containment/`.",
+    "- **Violation scope:** the clause only; see `.claude/audit-fixtures/tenant-upsert-guard/`.",
+  ];
+  const blockOf = computeBlockTexts(lines);
+  const declared = isSanctionedDeferredFixture({
+    kind: "backtick",
+    token: ".claude/audit-fixtures/path-containment/",
+    blockText: blockOf[1],
+  });
+  const neighbour = isSanctionedDeferredFixture({
+    kind: "backtick",
+    token: ".claude/audit-fixtures/tenant-upsert-guard/",
+    blockText: blockOf[2],
+  });
+  check(
+    "fixture-28-a-block-does-not-borrow-a-neighbouring-bullets-declaration",
+    declared === true && neighbour === false,
+    `declared=${declared} neighbour=${neighbour} block2=${JSON.stringify(blockOf[2])}`,
+  );
+}
+
+// ------------------------------------------------------------------
+// fixture-29-a-typo-of-a-real-deferred-slug-stays-visible
+// ------------------------------------------------------------------
+// THE property this carve-out exists to preserve, pinned against the cheaper
+// design that was proposed and rejected: ONE batched entry sanctioning any
+// `audit-fixtures/*` cited in a Phase-2-declaring block. That variant is
+// indistinguishable from this one on CORRECT references and absorbs every TYPO,
+// because a typo appears in exactly the same prose as the thing it misspells.
+//
+// It matters here more than it looks: `detection-binding-check.mjs` classifies a
+// typo'd deferred path as `deferred-fixtures-absent` (reported, NOT fatal) just
+// like a correct one — its positive allowlist is over binding NAMESPACES, not
+// slugs. So this enumeration is the only place in the corpus where a misspelled
+// deferred fixture path is still visible. Loosen it and nothing else catches it.
+//
+// Discriminating: drop the SANCTIONED_DEFERRED_FIXTURES membership test (i.e.
+// adopt the batched design) ⇒ every typo arm below flips to sanctioned ⇒ RED.
+{
+  const declaring =
+    "- **Detection mechanism:** Phase 2 (deferred per `trust-posture.md` § Two-Phase " +
+    "Rollout) — no hook detector; audit fixtures land with the Phase-2 detector there.";
+  const sanctioned = (token) =>
+    isSanctionedDeferredFixture({ kind: "backtick", token, blockText: declaring });
+
+  // Correct spellings of real, currently-deferred slugs: sanctioned.
+  const correct =
+    sanctioned(".claude/audit-fixtures/tenant-upsert-guard/") &&
+    sanctioned(".claude/audit-fixtures/path-containment/") &&
+    sanctioned(".claude/audit-fixtures/handoff-completion/");
+  // One-character corruptions of those SAME slugs, in the SAME prose: NOT sanctioned.
+  const typosVisible =
+    !sanctioned(".claude/audit-fixtures/tenant-upsert-gaurd/") &&
+    !sanctioned(".claude/audit-fixtures/path-contaiment/") &&
+    !sanctioned(".claude/audit-fixtures/handoff-completeion/");
+
+  check(
+    "fixture-29-a-typo-of-a-real-deferred-slug-stays-visible",
+    correct === true && typosVisible === true,
+    `correct=${correct} typosVisible=${typosVisible}`,
+  );
+}
+
+// ------------------------------------------------------------------
+// fixture-30-extract-tokens-supplies-the-block-scoped-declaration
+// ------------------------------------------------------------------
+// fixtures 25/27/28 all exercise `isSanctionedDeferredFixture` against a
+// `blockText` the FIXTURE hand-builds by calling `computeBlockTexts` itself. That
+// pins the CONSUMER and leaves the PRODUCER unpinned: nothing asserted that
+// `extractTokens` actually attaches the enclosing block to the finding it emits.
+// Measured: degrading `extractTokens`'s `computeBlockTexts(lines)` to a per-line
+// map executed 17 times during this suite and reddened nothing — the block-scoped
+// guard would have silently reverted to the line-scoped behaviour that fixture-25
+// exists to prevent, with the whole suite green.
+//
+// So this fixture runs the REAL extractor end-to-end over a hard-wrapped Wiring
+// bullet and asserts the finding it produces is sanctioned. BIPOLAR: the same
+// token in a bullet that names audit fixtures but declares NO deferral must come
+// back unsanctioned, so a producer that stapled a permissive block onto every
+// finding could not pass either.
+{
+  const wrapped = [
+    "- **Detection mechanism:** Phase 1 (manual, gate-review) — reviewer inspects the",
+    "  transcript for an idle-wait window (MUST-6). Phase 2 (deferred per",
+    "  `rules/trust-posture.md` § Two-Phase Rollout): advisory Stop-event detector at",
+    "  `.claude/audit-fixtures/wave-loop/orchestration-hygiene/` per `rules/cc-artifacts.md` Rule 9.",
+  ].join("\n");
+  // Same token, same "audit fixtures" vocabulary, NO deferral declaration.
+  const undeclared = [
+    "- **Detection mechanism:** Phase 1 (manual, gate-review) — reviewer inspects the",
+    "  transcript for an idle-wait window (MUST-6), with audit fixtures at",
+    "  `.claude/audit-fixtures/wave-loop/orchestration-hygiene/` per `rules/cc-artifacts.md` Rule 9.",
+  ].join("\n");
+  const TOKEN = ".claude/audit-fixtures/wave-loop/orchestration-hygiene/";
+  const pick = (text) =>
+    extractTokens(text, ".claude/rules/wave-loop.md").find((f) => f.token === TOKEN);
+
+  const declared = pick(wrapped);
+  const bare = pick(undeclared);
+
+  check(
+    "fixture-30-extract-tokens-supplies-the-block-scoped-declaration",
+    !!declared &&
+      !!bare &&
+      isSanctionedDeferredFixture(declared) === true &&
+      isSanctionedDeferredFixture(bare) === false,
+    `declared=${declared && isSanctionedDeferredFixture(declared)} bare=${bare && isSanctionedDeferredFixture(bare)}`,
+  );
+}
+
+// ------------------------------------------------------------------
+// fixture-31/32/33 — loom#1406: citations INTO `.claude/guides/**`.
+//
+// BIPOLAR, and the two poles test DIFFERENT halves of the same fix, because the
+// gap had two independent halves. 31 pins the TOKEN SURFACE (a `guides/` token is
+// extracted at all); 32 pins the SCOPE (the tree is walked on a default run). Each
+// would pass while the other regressed, so neither alone pins the fix.
+//
+// The pre-fix measurement these encode: a broken `.claude/guides/…` and a broken
+// bare `guides/…` citation, planted in a file under `.claude/rules/` — already in
+// the default scope — produced ZERO findings and exit 0, while a `rules/…` control
+// on the adjacent line was reported dangling in the SAME run. The control is what
+// makes that a token-surface verdict rather than a "the file was not read" one.
+// ------------------------------------------------------------------
+{
+  const text = [
+    "control: `rules/ghost-1406.md`",
+    "dot-claude form: `.claude/guides/rule-extracts/ghost-1406.md`",
+    "bare form: `guides/rule-extracts/ghost-1406.md`",
+  ].join("\n");
+  const tokens = extractTokens(text, ".claude/rules/probe.md").map((f) => f.token);
+
+  // POLE A (efficacy) — both guides forms are extracted. Pre-fix this was [control] only.
+  check(
+    "fixture-31a-guides-backtick-tokens-are-extracted",
+    tokens.includes(".claude/guides/rule-extracts/ghost-1406.md") &&
+      tokens.includes("guides/rule-extracts/ghost-1406.md"),
+    `got tokens=${JSON.stringify(tokens)}`,
+  );
+
+  // The control must ALSO fire — otherwise a green above could mean "extractor
+  // broken in a way that matches everything", not "guides is now covered".
+  check(
+    "fixture-31b-control-token-still-extracted",
+    tokens.includes("rules/ghost-1406.md") && tokens.length === 3,
+    `got tokens=${JSON.stringify(tokens)}`,
+  );
+
+  // POLE B (no-false-positive) — an extracted guides token that names a file which
+  // genuinely EXISTS must resolve. Without this, fixture-31 alone is satisfied by a
+  // matcher that flags every guides citation as dangling.
+  const real = "guides/rule-extracts/autonomous-execution.md";
+  check(
+    "fixture-31c-real-guides-target-resolves",
+    resolveRefToken(real, REPO_ROOT, ".claude/rules/probe.md", "backtick").ok === true,
+    `expected ${real} to resolve under ${REPO_ROOT}`,
+  );
+
+  // A guides token naming a file that does NOT exist must NOT resolve — the pole
+  // that makes 31c a discriminating check rather than a resolver that says yes.
+  check(
+    "fixture-31d-absent-guides-target-does-not-resolve",
+    resolveRefToken(
+      "guides/rule-extracts/ghost-1406.md",
+      REPO_ROOT,
+      ".claude/rules/probe.md",
+      "backtick",
+    ).ok === false,
+    "expected a non-existent guides target to report not-found",
+  );
+}
+
+{
+  // fixture-32 — SCOPE half. The guides tree must be walked on a DEFAULT run;
+  // before loom#1406 it was reachable only via an explicit `--scope .claude/guides`.
+  check(
+    "fixture-32-guides-tree-in-default-scope",
+    DEFAULT_SCOPE_DIRS.includes(".claude/guides"),
+    `got DEFAULT_SCOPE_DIRS=${JSON.stringify(DEFAULT_SCOPE_DIRS)}`,
+  );
+}
+
+// ------------------------------------------------------------------
+// fixture-33 — finding id `journal-tree-absent-not-applicable`
+// ------------------------------------------------------------------
+// `journal/` is loom-only and never distributed, so at every consumer EVERY
+// backticked provenance citation pointed at an absent tree and was reported as a
+// dangling defect. THREE poles on otherwise-identical trees, because two would
+// not separate "consumer" from "the tree is simply gone at loom":
+//   (a) no journal/, consumer-class VERSION  → notApplicable, does NOT red
+//   (b) journal/ PRESENT, entry missing      → journal-entry-not-found, STILL reds
+//   (c) no journal/, VERSION type=coc-source → journal-dir-missing, STILL reds
+// Pole (c) is what stops the carve-out from being a blanket amnesty: at the one
+// repo that OWNS the tree, its absence stays loud.
+{
+  const tmp = mkdtempSync(join(tmpdir(), "xref-fix-33-"));
+  try {
+    // (a) consumer: no journal tree, consumer-class VERSION
+    const consumer = join(tmp, "consumer");
+    mkdirSync(join(consumer, ".claude"), { recursive: true });
+    writeFileSync(
+      join(consumer, ".claude", "VERSION"),
+      JSON.stringify({ version: "0.0.0", type: "coc-use-template" }),
+    );
+    const na = resolveJournalToken("journal/0569", consumer);
+    check(
+      "fixture-33a-journal-tree-absent-is-not-applicable-at-a-consumer",
+      na.ok === false &&
+        na.notApplicable === true &&
+        na.reason === "journal-tree-absent-not-applicable",
+      `got ${JSON.stringify(na)}`,
+    );
+
+    // (b) tree present, entry absent — the genuine-defect pole, unchanged.
+    const withTree = join(tmp, "with-tree");
+    mkdirSync(join(withTree, "journal"), { recursive: true });
+    mkdirSync(join(withTree, ".claude"), { recursive: true });
+    writeFileSync(
+      join(withTree, ".claude", "VERSION"),
+      JSON.stringify({ version: "0.0.0", type: "coc-use-template" }),
+    );
+    writeFileSync(join(withTree, "journal", "0569-DECISION-real.md"), "# real");
+    const present = resolveJournalToken("journal/0569", withTree);
+    const missingEntry = resolveJournalToken("journal/9999", withTree);
+    check(
+      "fixture-33b-entry-missing-under-a-present-tree-still-reds",
+      present.ok === true &&
+        missingEntry.ok === false &&
+        missingEntry.notApplicable !== true &&
+        missingEntry.reason === "journal-entry-not-found",
+      `present=${JSON.stringify(present)} missing=${JSON.stringify(missingEntry)}`,
+    );
+
+    // (c) coc-source with NO tree — the anti-amnesty pole.
+    const source = join(tmp, "source");
+    mkdirSync(join(source, ".claude"), { recursive: true });
+    writeFileSync(
+      join(source, ".claude", "VERSION"),
+      JSON.stringify({ version: "0.0.0", type: "coc-source" }),
+    );
+    const loud = resolveJournalToken("journal/0569", source);
+    check(
+      "fixture-33c-absent-tree-at-coc-source-stays-loud",
+      loud.ok === false &&
+        loud.notApplicable !== true &&
+        loud.reason === "journal-dir-missing",
+      `got ${JSON.stringify(loud)}`,
+    );
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+}
+
+// ------------------------------------------------------------------
+// fixture-34 — finding id `case-insensitive-false-green`
+// ------------------------------------------------------------------
+// `lstatSync` answers YES for a wrong-case token on a case-INSENSITIVE
+// filesystem (macOS APFS, Windows NTFS), so the SAME tree used to yield a
+// different verdict on an operator's mac than on the Linux CI runner — and the
+// mac one was the FALSE GREEN. Both poles are asserted on ONE tree so the check
+// is meaningful on a case-SENSITIVE filesystem too (there the wrong-case pole
+// fails for the ordinary reason, and the exact-case pole still has to pass).
+{
+  const tmp = mkdtempSync(join(tmpdir(), "xref-fix-34-"));
+  try {
+    mkdirSync(join(tmp, ".claude", "rules"), { recursive: true });
+    writeFileSync(join(tmp, ".claude", "rules", "documentation.md"), "# doc");
+    const exact = resolveRefToken(
+      "rules/documentation.md",
+      tmp,
+      ".claude/rules/probe.md",
+      "backtick",
+    );
+    // Mixed case, NOT the ALL-CAPS emitted-id shape, so the emitted-id pass
+    // cannot rescue it — this pole isolates the case check alone.
+    const wrongCase = resolveRefToken(
+      "rules/Documentation.md",
+      tmp,
+      ".claude/rules/probe.md",
+      "backtick",
+    );
+    check(
+      "fixture-34-wrong-case-token-does-not-resolve-on-a-case-insensitive-fs",
+      exact.ok === true && wrongCase.ok === false && wrongCase.reason === "not-found",
+      `exact=${JSON.stringify(exact)} wrongCase=${JSON.stringify(wrongCase)}`,
+    );
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+}
+
+// ------------------------------------------------------------------
+// fixture-35 — finding id `absent-by-design-is-loom-centric`
+// ------------------------------------------------------------------
+// The per-target derivation replaces a hand-list evaluated against ONE
+// filesystem. The two poles that matter are the ones that decide whether it can
+// still fail: a manifest-PROVEN absence suppresses, and a merely-UNDECLARED
+// absence does NOT. `artifact-flow.md` § MUST NOT is explicit that "matches
+// nothing" must never be relied on as a fence, so `no_tier_match` with no tier
+// glob behind it stays reportable.
+{
+  const mkPlan = (rows, tierGlobs) => ({
+    byPath: new Map(rows.map((r) => [r.path, r])),
+    paths: rows.map((r) => r.path),
+    allTierGlobs: tierGlobs,
+    // Stand-in for sync-tier-aware's matcher: prefix membership is enough to
+    // separate "lives in some tier" from "matches no tier at all".
+    matchesAnyManifestGlob: (p, globs) => globs.some((g) => p.startsWith(g)),
+  });
+
+  const proven = mkPlan(
+    [{ path: ".claude/commands/govern.md", action: "skip", reason: "loom_only" }],
+    [],
+  );
+  check(
+    "fixture-35a-manifest-proven-absence-is-suppressed",
+    (() => {
+      const d = targetDisposition(".claude/commands/govern.md", proven);
+      return d.received === false && d.proven === true && d.reason === "loom_only";
+    })(),
+    JSON.stringify(targetDisposition(".claude/commands/govern.md", proven)),
+  );
+
+  // Same skip, but the path DOES live in a tier — this target just does not
+  // subscribe it. Proven, and reported under its own reason.
+  const unsubscribed = mkPlan(
+    [{ path: ".claude/skills/02-dataflow/x.md", action: "skip", reason: "no_tier_match" }],
+    [".claude/skills/02-dataflow/"],
+  );
+  check(
+    "fixture-35b-tier-not-subscribed-is-proven-absence",
+    (() => {
+      const d = targetDisposition(".claude/skills/02-dataflow/x.md", unsubscribed);
+      return d.proven === true && d.reason === "tier_not_subscribed";
+    })(),
+    JSON.stringify(targetDisposition(".claude/skills/02-dataflow/x.md", unsubscribed)),
+  );
+
+  // The anti-amnesty pole: skipped, and NOTHING in the manifest declares it.
+  const undeclared = mkPlan(
+    [{ path: ".claude/bin/run-audit-fixtures.mjs", action: "skip", reason: "no_tier_match" }],
+    [".claude/skills/"],
+  );
+  check(
+    "fixture-35c-undeclared-absence-is-NOT-suppressed",
+    (() => {
+      const d = targetDisposition(".claude/bin/run-audit-fixtures.mjs", undeclared);
+      return d.received === false && d.proven === false;
+    })(),
+    JSON.stringify(targetDisposition(".claude/bin/run-audit-fixtures.mjs", undeclared)),
+  );
+
+  // `overlay` DELIVERS the file. Reading `copy` alone reported 62 false dangling
+  // refs for base, every one of them a variant-overlaid rule.
+  const overlaid = mkPlan(
+    [{ path: ".claude/rules/agents.md", action: "overlay", reason: "variant_overlay" }],
+    [],
+  );
+  check(
+    "fixture-35d-variant-overlay-counts-as-received",
+    targetDisposition(".claude/rules/agents.md", overlaid).received === true,
+    JSON.stringify(targetDisposition(".claude/rules/agents.md", overlaid)),
+  );
+
+  // A directory token reaches the target if ANY file under it does.
+  const dirPlan = mkPlan(
+    [
+      { path: ".claude/skills/x/a.md", action: "skip", reason: "loom_only" },
+      { path: ".claude/skills/x/b.md", action: "copy", reason: "tier_match" },
+    ],
+    [],
+  );
+  check(
+    "fixture-35e-directory-token-received-when-any-child-is",
+    targetDisposition(".claude/skills/x", dirPlan).received === true,
+    JSON.stringify(targetDisposition(".claude/skills/x", dirPlan)),
+  );
+}
+
+// ------------------------------------------------------------------
+// fixture-36 — plan paths carry the `.claude/` prefix
+// ------------------------------------------------------------------
+// `sync-tier-aware.mjs::walkClaudeDir` emits `.claude/rules/foo.md`, NOT
+// `rules/foo.md`. Keying on the stripped form matched 0 of 3881 plan rows and
+// silently disabled the whole derivation — a failure that looked exactly like
+// "nothing is absent-by-design". Pinned so the shape cannot drift back.
+{
+  const root = "/tmp/xref-fix-36-root";
+  check(
+    "fixture-36a-manifest-relpath-keeps-the-claude-prefix",
+    toManifestRelpath(join(root, ".claude", "rules", "foo.md"), root) ===
+      ".claude/rules/foo.md",
+    `got ${toManifestRelpath(join(root, ".claude", "rules", "foo.md"), root)}`,
+  );
+  check(
+    "fixture-36b-paths-outside-dot-claude-are-not-manifest-governed",
+    toManifestRelpath(join(root, "journal", "0569-x.md"), root) === null &&
+      toManifestRelpath("/elsewhere/x.md", root) === null,
+    `journal=${toManifestRelpath(join(root, "journal", "0569-x.md"), root)}`,
+  );
+}
+
+// ------------------------------------------------------------------
+// fixture-37 — the SHIPPED declaration is SOURCE-SCOPED
+// ------------------------------------------------------------------
+// `absent[token].sources[]` is the dimension a flat path list cannot carry: the
+// same relative token denotes DIFFERENT paths from different citing files, so a
+// token excused everywhere would suppress it in a file where it genuinely
+// dangles. That is the amnesty direction, so the scoping is a correctness
+// property, not extra detail.
+{
+  const absent = {
+    "../01-core-sdk/SKILL.md": { why: "tier not subscribed", sources: [".claude/skills/02-dataflow/SKILL.md"] },
+    "commands/govern.md": { why: "loom_only", sources: [".claude/rules/x.md"] },
+  };
+  check(
+    "fixture-37a-declared-token-in-a-declared-source-is-excused",
+    isDeclaredXrefAbsent(
+      { token: "commands/govern.md", source: ".claude/rules/x.md", kind: "backtick" },
+      absent,
+    ) === true,
+    "expected a declared (token, source) pair to be excused",
+  );
+  // The anti-amnesty pole: SAME token, DIFFERENT citing file. From there the
+  // relative token resolves elsewhere and was never proven absent, so it must
+  // keep reporting.
+  check(
+    "fixture-37b-same-token-from-an-undeclared-source-is-NOT-excused",
+    isDeclaredXrefAbsent(
+      { token: "../01-core-sdk/SKILL.md", source: ".claude/skills/03-nexus/SKILL.md", kind: "md-link" },
+      absent,
+    ) === false,
+    "expected an undeclared source to stay reportable",
+  );
+  check(
+    "fixture-37c-undeclared-token-is-NOT-excused",
+    isDeclaredXrefAbsent(
+      { token: "rules/plant-does-not-exist.md", source: ".claude/rules/x.md", kind: "backtick" },
+      absent,
+    ) === false,
+    "expected an undeclared token to stay reportable",
+  );
+}
+
+// ------------------------------------------------------------------
+// fixture-38 — ABSENT vs UNRECOGNISED-VERSION vs MALFORMED
+// ------------------------------------------------------------------
+// Three outcomes that must not collapse. Absent and unrecognised-version are
+// both SILENT — the first because a consumer that has not re-synced must be
+// unaffected, the second because a newer loom writing a future format to an
+// older checker is forward-compat, not corruption. MALFORMED is LOUD, because
+// reading a broken declaration as "absent" makes it indistinguishable from a
+// clean run.
+{
+  const tmp = mkdtempSync(join(tmpdir(), "xref-fix-38-"));
+  const decl = join(tmp, ".claude", ".coc-xref-absent.json");
+  const write = (o) =>
+    writeFileSync(decl, typeof o === "string" ? o : JSON.stringify(o, null, 2));
+  try {
+    mkdirSync(join(tmp, ".claude"), { recursive: true });
+
+    check(
+      "fixture-38a-absent-declaration-is-silent",
+      (() => {
+        const r = loadXrefAbsentDeclaration(tmp);
+        return r.absent === null && !r.error;
+      })(),
+      JSON.stringify(loadXrefAbsentDeclaration(tmp)),
+    );
+
+    write({ format: 1, absent: { "commands/govern.md": { why: "loom_only", sources: ["a.md"] } } });
+    check(
+      "fixture-38b-valid-format-1-parses",
+      (() => {
+        const r = loadXrefAbsentDeclaration(tmp);
+        return !r.error && r.absent && r.absent["commands/govern.md"].sources[0] === "a.md";
+      })(),
+      JSON.stringify(loadXrefAbsentDeclaration(tmp).error || "ok"),
+    );
+
+    // FORWARD-COMPAT: a version this reader does not know is silent, NOT an
+    // error. Distinguished from malformed on purpose.
+    write({ format: 99, absent: { "x.md": { why: "future", sources: ["a.md"] } } });
+    check(
+      "fixture-38c-unrecognised-version-is-silent-not-an-error",
+      (() => {
+        const r = loadXrefAbsentDeclaration(tmp);
+        return r.absent === null && !r.error && r.unsupportedFormat === 99;
+      })(),
+      JSON.stringify(loadXrefAbsentDeclaration(tmp)),
+    );
+
+    for (const [name, body] of [
+      ["unparseable JSON", "{ not json"],
+      ["a JSON array, not an object", "[]"],
+      ["no format field", JSON.stringify({ absent: {} })],
+      ["format 1 with no absent object", JSON.stringify({ format: 1 })],
+      ["format 1 with absent as an array", JSON.stringify({ format: 1, absent: [] })],
+      ["an entry that is not an object", JSON.stringify({ format: 1, absent: { "a.md": "nope" } })],
+      ["an entry with no sources array", JSON.stringify({ format: 1, absent: { "a.md": { why: "x" } } })],
+      [
+        "an entry whose sources hold a non-string",
+        JSON.stringify({ format: 1, absent: { "a.md": { why: "x", sources: [7] } } }),
+      ],
+    ]) {
+      write(body);
+      check(
+        `fixture-38d-malformed-fails-loud — ${name}`,
+        (() => {
+          const r = loadXrefAbsentDeclaration(tmp);
+          return !!r.error && r.absent === undefined;
+        })(),
+        `${name}: ${JSON.stringify(loadXrefAbsentDeclaration(tmp))}`,
+      );
+    }
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+}
+
+// ------------------------------------------------------------------
+process.stdout.write(`\n${passed}/${passed + failed} fixtures pass\n`);
+process.exit(failed === 0 ? 0 : 1);

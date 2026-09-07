@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# loom dev-container distribution source (py) — generated INTO consumer templates by /sync-to-use; do not hand-edit the consumer copy. Registry host/org are ecosystem-relative, substituted at /sync-to-use distribution.
+# Project-owned postCreate escape hatch — copy to `.devcontainer/postCreate.user.sh` to activate.
+#
+#     cp .devcontainer/postCreate.user.sh.example .devcontainer/postCreate.user.sh
+#
+# The template-owned `.devcontainer/postCreate.sh` SOURCES this file (if present) as its last
+# step — so it runs in the SAME shell, as user `dev`, in /workspace, with the shared venv
+# ($VIRTUAL_ENV=/opt/venv) already on PATH. Use it for arbitrary project setup that the
+# standard overlay surfaces (requirements-user.txt / package.json / pre-commit) don't cover.
+#
+# Your `postCreate.user.sh` is project-owned and survives /sync; this `.example` is
+# template-owned (regenerated). Keep it IDEMPOTENT — postCreate.sh is re-runnable on demand.
+#
+# Examples (uncomment / adapt):
+#
+#   # Run the project's own bootstrap target:
+#   # make bootstrap
+#
+#   # Install the project package itself in editable mode into the shared venv:
+#   # [ -f pyproject.toml ] && uv pip install -e .
+#
+#   # Seed a local dev database (DB services up via: docker compose --profile db up -d):
+#   # python scripts/seed_dev_data.py
+#
+#   # Pull a model / fixture the app needs at dev time:
+#   # python -m myproject.download_assets
+
+echo ">> postCreate.user.sh: (example — replace with your project setup)"

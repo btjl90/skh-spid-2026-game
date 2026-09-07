@@ -1,0 +1,30 @@
+# loom dev-container distribution source (py) — generated INTO consumer templates by /sync-to-use; do not hand-edit the consumer copy. Registry host/org are ecosystem-relative, substituted at /sync-to-use distribution.
+# Keep secrets + operator state + VCS out of the build context (N-H1 / secrets-and-auth.md S1).
+# An over-broad `COPY . .` must never bake any of these into a layer.
+.env
+.env.*
+!.env.example
+.git
+.claude/learning/
+.claude/operator-id
+.coc-fetch-cache
+**/.session-notes
+**/.coc-clone-init-witness
+
+# Build/dev cruft — irrelevant to the image, keeps the context small + fast.
+**/__pycache__/
+**/*.py[cod]
+**/.pytest_cache/
+**/.mypy_cache/
+**/.venv/
+**/node_modules/
+**/.DS_Store
+htmlcov/
+.coverage
+dist/
+build/
+*.egg-info/
+
+# The dev-container's own build artifacts (no recursion).
+Dockerfile
+.dockerignore

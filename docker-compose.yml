@@ -1,0 +1,96 @@
+# loom dev-container distribution source (py) — generated INTO consumer templates by /sync-to-use; do not hand-edit the consumer copy. Registry host/org are ecosystem-relative, substituted at /sync-to-use distribution.
+# Kailash COC dev environment — template-owned, regenerated on /sync.
+# `dev` is the workbench (a template-derived project is developed AND run here, plan §0
+# decision 2). The image is publisher-built and pulled from Docker Hub — consumers do
+# NOT build locally on first run. Override `DEV_IMAGE` in .env for template developers
+# rebuilding the publisher recipe (uncomment the `build:` block below to enable).
+#
+# DB services are profile-gated (`--profile db`) and mirror the existing
+# scripts/development/setup-databases.sh stack (postgres:15 + mysql:8.0, db `test`) so
+# DATABASE_URL resolves to a service name on the compose network (C1).
+# Project extension: drop a compose.override.yml beside this file — Docker auto-merges it.
+
+services:
+  dev:
+    # Pull the publisher-built image from Docker Hub (Architecture B, 2026-05-28 pivot).
+    # Override DEV_IMAGE in .env to use a local-build tag for publisher recipe iteration.
+    image: ${DEV_IMAGE:-docker.io/terrenefoundation/kailash-coc-py:1.10.1}
+    # Build path is OPT-IN for template developers iterating on the publisher recipe.
+    # Uncomment + set `DEV_IMAGE=kailash-coc-dev:local` in .env to activate.
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile
+    #   args:
+    #     # Linux UID alignment (M1) so bind-mounted files stay host-owned (I8).
+    #     # macOS Docker Desktop remaps ownership transparently — harmless there.
+    #     # NOTE: a bare `docker compose build/up` does NOT export the host UID — it uses
+    #     # 1000. On Linux with a non-1000 host UID, launch via ./bin/dev (which passes
+    #     # UID/GID) so .claude/learning/* stays host-owned (I8). Direct compose skips this.
+    #     USER_UID: ${UID:-1000}
+    #     USER_GID: ${GID:-1000}
+    # No `init:` — the image ENTRYPOINT is already `tini --` (PID 1, reaps the MCP-guard
+    # children, I6). Compose `init: true` would inject a SECOND init and make tini warn
+    # "not running as PID 1" (zero-tolerance: no stacked inits).
+    env_file:
+      - .env # secrets at runtime only — never a layer (S1/S2)
+    environment:
+      # DB reachable by compose service name when the `db` profile is up (C1).
+      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:password@postgres:5432/test}
+    volumes:
+      - .:/workspace:cached # the project IS the workspace (live edits, host-owned)
+      - uv-cache:/home/dev/.cache/uv
+      - npm-cache:/home/dev/.npm
+      - precommit-cache:/home/dev/.cache/pre-commit
+    ports:
+      # Loopback-bound (security: a template-shipped compose file must not expose dev
+      # services to the LAN). Override the host half via .env if you need LAN access.
+      - "127.0.0.1:${NEXUS_PORT:-8000}:8000" # Nexus/API dev server (local-app-launch, plan §0)
+    working_dir: /workspace
+    # Keep the container alive for `docker compose exec dev …` / editor attach.
+    command: ["sleep", "infinity"]
+
+  # ---- profile-gated DB services (mirror setup-databases.sh; `--profile db`) ----
+  postgres:
+    image: postgres:15
+    profiles: ["db"]
+    environment:
+      # LOCAL-DEV-ONLY throwaway credential mirroring setup-databases.sh; never reachable
+      # off-host (ports are loopback-bound below). NOT a real secret (security.md exception).
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: test
+    ports:
+      - "127.0.0.1:${PG_HOST_PORT:-5433}:5432" # loopback; 5433 host matches setup-databases.sh
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d test"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  mysql:
+    image: mysql:8.0
+    profiles: ["db"]
+    environment:
+      # LOCAL-DEV-ONLY throwaway credentials (see postgres note); loopback-bound below.
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_DATABASE: test
+      MYSQL_USER: test
+      MYSQL_PASSWORD: test
+    ports:
+      - "127.0.0.1:${MYSQL_HOST_PORT:-3307}:3306" # loopback
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck: # symmetry with postgres (reviewer M2) so DB-readiness is observable
+      test:
+        ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-ppassword"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  uv-cache:
+  npm-cache:
+  precommit-cache:
+  pg-data:
+  mysql-data:

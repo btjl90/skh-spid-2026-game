@@ -1,0 +1,30 @@
+# loom dev-container distribution source (py) — generated INTO consumer templates by /sync-to-use; do not hand-edit the consumer copy. Registry host/org are ecosystem-relative, substituted at /sync-to-use distribution.
+# Project-owned Compose overlay — copy to `compose.override.yml` to activate.
+#
+#     cp compose.override.yml.example compose.override.yml
+#
+# Docker AUTO-MERGES a file named `compose.override.yml` on top of docker-compose.yml for
+# every `docker compose` / `./bin/dev` command — no flag needed. Your `compose.override.yml`
+# is project-owned and survives /sync; this `.example` is template-owned (regenerated).
+#
+# Use it to add extra services, extra ports, extra env, or extra volumes WITHOUT editing the
+# template-owned docker-compose.yml (which /sync overwrites).
+
+services:
+  # ---- Example: an extra backing service (here, a Redis cache) -----------------------
+  # redis:
+  #   image: redis:7
+  #   ports:
+  #     - "127.0.0.1:6379:6379"   # loopback-bound, like the template's DB services
+
+  # ---- Example: extend the dev service (extra env / ports / a custom-built image) -----
+  dev:
+    # Extra environment for your app (secrets still come from .env — never hardcode here):
+    # environment:
+    #   REDIS_URL: redis://redis:6379/0
+    # Extra forwarded ports (e.g. a second dev server):
+    # ports:
+    #   - "127.0.0.1:8001:8001"
+    # Point at a Dockerfile.user image that adds OS packages (see Dockerfile.user.example):
+    # image: kailash-coc-dev:myproject
+    {}

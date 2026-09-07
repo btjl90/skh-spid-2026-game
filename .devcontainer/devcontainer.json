@@ -1,0 +1,69 @@
+// Kailash COC dev container — template-owned, regenerated on /sync (do not hand-edit
+// downstream; project customization goes in the *-user.* overlay files).
+// Editor door (VS Code / Cursor / Codespaces / JetBrains) onto the ONE Dockerfile at the
+// repo root. The compose door (docker-compose.yml + ./bin/dev) is the full-stack path with
+// profile-gated DB services; this build-mode config is the single-container editor-attach
+// path. Implements workspaces/dev-container/specs/dev-container-image.md (I3/I8) +
+// specs/secrets-and-auth.md (§Passthrough, §Signing-key passthrough) + specs/dependency-overlay.md.
+{
+  "name": "Kailash COC",
+
+  // Pull the publisher-built image from Docker Hub (Architecture B, 2026-05-28 pivot).
+  // The ONE publisher recipe lives at the repo-root Dockerfile (publisher-internal under
+  // Architecture B); consumers reference the published manifest here, they do not rebuild.
+  // updateRemoteUserUID below re-aligns the container user UID at attach time on Linux;
+  // macOS Docker Desktop remaps transparently.
+  "image": "docker.io/terrenefoundation/kailash-coc-py:1.10.1",
+
+  "remoteUser": "dev",
+  "updateRemoteUserUID": true,
+  "workspaceFolder": "/workspace",
+  // Bind the project so edits are live and files stay host-owned (I8).
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached",
+
+  // Secrets at runtime only — never a layer (S1/S2). The host .env is read at container
+  // create; nothing is baked. .env is in .dockerignore so it can never enter a build layer.
+  // initializeCommand (host-side, pre-create) gives the S4 clear error when .env is absent,
+  // instead of a cryptic `docker run --env-file` failure.
+  "initializeCommand": "test -f .env || { echo '>> Missing .env — copy .env.example to .env and fill your keys before Reopen in Container.'; exit 1; }",
+  "runArgs": ["--env-file", "${localWorkspaceFolder}/.env"],
+
+  // Named-volume caches (O4) so postCreate re-runs are fast and caches never bake into the
+  // image. Volumes auto-create on first use — safe to ship active (unlike host-path binds).
+  "mounts": [
+    "source=kailash-coc-uv-cache,target=/home/dev/.cache/uv,type=volume",
+    "source=kailash-coc-npm-cache,target=/home/dev/.npm,type=volume",
+    "source=kailash-coc-precommit-cache,target=/home/dev/.cache/pre-commit,type=volume"
+
+    // ---- OPT-IN: signing-key passthrough (specs/secrets-and-auth.md §Signing-key passthrough) ----
+    // Commit-signing keys are host-resident secrets. They are NOT mounted by default because a
+    // bind mount of a non-existent host path (a developer with no ~/.ssh) ABORTS container
+    // creation. Uncomment the line(s) matching how you sign, then rebuild. postCreate.sh stages
+    // the read-only mount into a writable ~/.ssh / GNUPGHOME so `git commit -S` works (a strictly
+    // read-only ~/.ssh breaks signed commits even though the coordination-log append succeeds).
+    //
+    // SSH signing (coc-sign.js default — keyType "ssh"):
+    // ,"source=${localEnv:HOME}/.ssh,target=/home/dev/.host-ssh,type=bind,readonly"
+    //
+    // GPG signing (when git config gpg.format is openpgp):
+    // ,"source=${localEnv:HOME}/.gnupg,target=/home/dev/.host-gnupg,type=bind,readonly"
+    //
+    // ---- OPT-IN: host gh login (default GitHub auth is GH_TOKEN in .env — reproducible) ----
+    // ,"source=${localEnv:HOME}/.config/gh,target=/home/dev/.config/gh,type=bind,readonly"
+    //
+    // ---- OPT-IN: host gitconfig (security MED-2: propagates user.signingkey / user.email) ----
+    // Without this, signing keys above are staged but `git commit -S` won't know which key
+    // to use unless you re-run `git config --global user.signingkey ...` inside the container.
+    // postCreate.sh stages this read-only mount into a writable ~/.gitconfig.
+    // ,"source=${localEnv:HOME}/.gitconfig,target=/home/dev/.host-gitconfig,type=bind,readonly"
+  ],
+
+  // Nexus / API dev server (local-app-launch, plan §0 decision 2). Add more in
+  // compose.override.yml or here via a project fork of this file's overlay.
+  "forwardPorts": [8000],
+
+  // Idempotent overlay orchestrator — installs requirements-user.txt / package.json into the
+  // SAME shared /opt/venv the base used (O1), stages signing keys, wires pre-commit. Re-runnable
+  // on demand: `docker compose exec dev .devcontainer/postCreate.sh` (or in-editor terminal).
+  "postCreateCommand": "bash .devcontainer/postCreate.sh"
+}
