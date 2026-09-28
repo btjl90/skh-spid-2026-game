@@ -1,0 +1,1438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SKH Sentinel Station — Wound Prevention Command</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #000814;
+            color: #e0e0e0;
+            font-family: 'Courier New', monospace;
+            min-height: 100vh;
+            overflow-x: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .stars {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .star {
+            position: absolute;
+            background: white;
+            border-radius: 50%;
+            animation: twinkle 3s infinite alternate;
+        }
+
+        @keyframes twinkle {
+            0% { opacity: 0.2; }
+            100% { opacity: 1; }
+        }
+
+        .container {
+            position: relative;
+            z-index: 1;
+            max-width: 860px;
+            width: 100%;
+            margin: 0 auto;
+            padding: 40px 20px;
+            text-align: center;
+        }
+
+        /* ── Logo / Emblem ── */
+        .emblem {
+            font-size: 5em;
+            margin-bottom: 10px;
+            animation: float 4s ease-in-out infinite;
+            filter: drop-shadow(0 0 20px #00ffe7);
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-12px); }
+        }
+
+        /* ── Title Block ── */
+        .station-title {
+            font-size: 2em;
+            color: #00ffe7;
+            text-shadow: 0 0 20px #00ffe7, 0 0 40px #00ffe755;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+            animation: glow 3s ease-in-out infinite alternate;
+        }
+
+        @keyframes glow {
+            0% { text-shadow: 0 0 10px #00ffe7; }
+            100% { text-shadow: 0 0 30px #00ffe7, 0 0 60px #00ffe755; }
+        }
+
+        .station-subtitle {
+            font-size: 0.9em;
+            color: #7ecfff;
+            letter-spacing: 3px;
+            margin-bottom: 6px;
+        }
+
+        .station-year {
+            font-size: 0.75em;
+            color: #3a7a9c;
+            letter-spacing: 2px;
+            margin-bottom: 30px;
+        }
+
+        /* ── HEAL Badge ── */
+        .heal-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, #001f3f, #003366);
+            border: 1px solid #00ffe7;
+            border-radius: 20px;
+            padding: 6px 22px;
+            font-size: 0.78em;
+            color: #00ffe7;
+            letter-spacing: 2px;
+            margin-bottom: 40px;
+            animation: pulse-badge 2s infinite;
+        }
+
+        @keyframes pulse-badge {
+            0%, 100% { box-shadow: 0 0 6px #00ffe744; }
+            50% { box-shadow: 0 0 18px #00ffe7aa; }
+        }
+
+        /* ── Divider ── */
+        .divider {
+            border: none;
+            border-top: 1px solid #00ffe722;
+            margin: 0 auto 40px;
+            max-width: 500px;
+        }
+
+        /* ── Mission Brief Card ── */
+        .brief-card {
+            background: rgba(0, 10, 30, 0.85);
+            border: 1px solid #00ffe755;
+            border-radius: 16px;
+            padding: 30px 36px;
+            margin-bottom: 30px;
+            text-align: left;
+            animation: fadeIn 1s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(24px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .brief-title {
+            color: #ffcc00;
+            font-size: 0.8em;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            margin-bottom: 14px;
+            text-shadow: 0 0 8px #ffcc0066;
+        }
+
+        .brief-text {
+            font-size: 0.85em;
+            color: #b0d4e8;
+            line-height: 1.9;
+            margin-bottom: 20px;
+        }
+
+        .brief-text strong {
+            color: #00ffe7;
+        }
+
+        /* ── Mission Stats ── */
+        .stats-row {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-top: 10px;
+        }
+
+        .stat-chip {
+            background: rgba(0, 255, 231, 0.06);
+            border: 1px solid #00ffe733;
+            border-radius: 8px;
+            padding: 10px 16px;
+            font-size: 0.78em;
+            color: #7ecfff;
+            flex: 1;
+            min-width: 120px;
+            text-align: center;
+            line-height: 1.6;
+        }
+
+        .stat-chip .stat-val {
+            display: block;
+            font-size: 1.4em;
+            color: #00ffe7;
+            font-weight: bold;
+            margin-bottom: 2px;
+        }
+
+        /* ── Scene Preview ── */
+        .scenes-preview {
+            display: flex;
+            gap: 14px;
+            flex-wrap: wrap;
+            margin-bottom: 30px;
+        }
+
+        .scene-chip {
+            flex: 1;
+            min-width: 200px;
+            background: rgba(0, 10, 30, 0.85);
+            border: 1px solid #00ffe733;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: left;
+            animation: fadeIn 1.2s ease;
+        }
+
+        .scene-chip-icon {
+            font-size: 1.8em;
+            margin-bottom: 8px;
+        }
+
+        .scene-chip-title {
+            font-size: 0.82em;
+            color: #ffcc00;
+            letter-spacing: 1px;
+            margin-bottom: 6px;
+        }
+
+        .scene-chip-desc {
+            font-size: 0.75em;
+            color: #7ecfff;
+            line-height: 1.6;
+        }
+
+        .scene-chip-badge {
+            display: inline-block;
+            margin-top: 10px;
+            background: #ffcc0015;
+            border: 1px solid #ffcc0055;
+            border-radius: 10px;
+            padding: 2px 10px;
+            font-size: 0.7em;
+            color: #ffcc00;
+            letter-spacing: 1px;
+        }
+
+        /* ── HEAL Intro Speech ── */
+        .heal-speech {
+            background: linear-gradient(135deg, rgba(0,50,80,0.6), rgba(0,30,60,0.6));
+            border-left: 3px solid #00ffe7;
+            border-radius: 0 12px 12px 0;
+            padding: 16px 20px;
+            margin-bottom: 30px;
+            font-size: 0.85em;
+            color: #c8eeff;
+            font-style: italic;
+            line-height: 1.8;
+            text-align: left;
+            animation: fadeIn 1.4s ease;
+        }
+
+        .heal-label {
+            color: #00ffe7;
+            font-style: normal;
+            font-size: 0.78em;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        /* ── Launch Button ── */
+        .launch-btn {
+            background: linear-gradient(135deg, #003366, #005599);
+            border: 2px solid #00ffe7;
+            border-radius: 14px;
+            padding: 18px 60px;
+            color: #00ffe7;
+            font-family: 'Courier New', monospace;
+            font-size: 1.05em;
+            cursor: pointer;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            transition: all 0.3s ease;
+            box-shadow: 0 0 20px #00ffe733;
+            animation: fadeIn 1.6s ease;
+        }
+
+        .launch-btn:hover {
+            background: linear-gradient(135deg, #004488, #0077bb);
+            box-shadow: 0 0 40px #00ffe766, 0 0 80px #00ffe722;
+            transform: translateY(-4px) scale(1.02);
+        }
+
+        .launch-btn:active {
+            transform: translateY(-1px) scale(0.99);
+        }
+
+        .launch-hint {
+            font-size: 0.72em;
+            color: #3a7a9c;
+            letter-spacing: 2px;
+            margin-top: 14px;
+        }
+
+        /* ── Footer ── */
+        .footer {
+            margin-top: 50px;
+            font-size: 0.7em;
+            color: #2a5a7a;
+            letter-spacing: 1px;
+            line-height: 2;
+        }
+
+        @media (max-width: 600px) {
+            .station-title { font-size: 1.3em; letter-spacing: 2px; }
+            .emblem { font-size: 3.5em; }
+            .brief-card { padding: 20px; }
+            .launch-btn { padding: 16px 36px; font-size: 0.9em; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="stars" id="stars"></div>
+
+<div class="container">
+
+    <!-- Emblem -->
+    <div class="emblem">🌌</div>
+
+    <!-- Title -->
+    <div class="station-title">SKH Sentinel Station</div>
+    <div class="station-subtitle">Wound Prevention Command</div>
+    <div class="station-year">YEAR 2050 — CLASSIFIED TRAINING SIMULATION</div>
+    <div class="heal-badge">⚡ H.E.A.L. AI Unit Online</div>
+
+    <hr class="divider">
+
+    <!-- Mission Brief -->
+    <div class="brief-card">
+        <div class="brief-title">📋 Mission Briefing</div>
+        <div class="brief-text">
+            Welcome, <strong>Specialist</strong>. You have been assigned to SKH Sentinel Station — 
+            the galaxy's most advanced wound prevention command centre.<br><br>
+            Two patients are at critical risk. Your clinical decisions will determine whether 
+            their skin integrity holds — or fails. H.E.A.L., your AI co-pilot, will guide you 
+            through each scenario. Answer wisely. Every choice matters.
+        </div>
+        <div class="stats-row">
+            <div class="stat-chip">
+                <span class="stat-val">2</span>
+                Scenes
+            </div>
+            <div class="stat-chip">
+                <span class="stat-val">6</span>
+                Questions
+            </div>
+            <div class="stat-chip">
+                <span class="stat-val">60</span>
+                Max Score
+            </div>
+            <div class="stat-chip">
+                <span class="stat-val">~10</span>
+                Min Duration
+            </div>
+        </div>
+    </div>
+
+    <!-- Scene Preview -->
+    <div class="scenes-preview">
+        <div class="scene-chip">
+            <div class="scene-chip-icon">🚀</div>
+            <div class="scene-chip-title">Scene 1: "May the Force Be Off You"</div>
+            <div class="scene-chip-desc">Patient ALPHA is bedbound with sacral redness. Pressure is building. Can you offload in time?</div>
+            <span class="scene-chip-badge">PRESSURE INJURY</span>
+        </div>
+        <div class="scene-chip">
+            <div class="scene-chip-icon">🌊</div>
+            <div class="scene-chip-title">Scene 2: "Splash Zone — The Moisture Menace"</div>
+            <div class="scene-chip-desc">Patient BETA has double incontinence and perineal erythema. The skin barrier is under siege.</div>
+            <span class="scene-chip-badge">MASD</span>
+        </div>
+    </div>
+
+    <!-- HEAL Speech -->
+    <div class="heal-speech">
+        <span class="heal-label">⚡ H.E.A.L. AI — PRE-MISSION TRANSMISSION:</span>
+        "Specialist, the station is counting on you. Pressure and moisture are silent threats — 
+        they don't announce themselves until the damage is done. Your knowledge is the only 
+        shield these patients have. I'll be with you every step of the way. 
+        Let's begin."
+    </div>
+
+    <!-- Launch -->
+    <button class="launch-btn" onclick="window.location.href='game.html'">
+        ▶ LAUNCH MISSION
+    </button>
+    <div class="launch-hint">— CLICK TO BEGIN SIMULATION —</div>
+
+    <!-- Footer -->
+    <div class="footer">
+        SKH SENTINEL STATION &nbsp;|&nbsp; WOUND PREVENTION COMMAND &nbsp;|&nbsp; YEAR 2050<br>
+        FOR TRAINING PURPOSES ONLY — SINGAPORE HEALTH SERVICES
+    </div>
+
+</div>
+
+<script>
+    // Starfield
+    const starsContainer = document.getElementById('stars');
+    for (let i = 0; i < 120; i++) {
+        const star = document.createElement('div');
+        star.classList.add('star');
+        const size = Math.random() * 2.5 + 0.5;
+        star.style.cssText = `
+            width:${size}px; height:${size}px;
+            top:${Math.random() * 100}%;
+            left:${Math.random() * 100}%;
+            animation-delay:${Math.random() * 3}s;
+            animation-duration:${2 + Math.random() * 3}s;
+        `;
+        starsContainer.appendChild(star);
+    }
+</script>
+
+</body>
+</html>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SKH Sentinel Station — Wound Prevention Command</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #000814;
+            color: #e0e0e0;
+            font-family: 'Courier New', monospace;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .stars {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .star {
+            position: absolute;
+            background: white;
+            border-radius: 50%;
+            animation: twinkle 3s infinite alternate;
+        }
+
+        @keyframes twinkle {
+            0% { opacity: 0.2; }
+            100% { opacity: 1; }
+        }
+
+        .container {
+            position: relative;
+            z-index: 1;
+            max-width: 860px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .station-header {
+            text-align: center;
+            padding: 30px 20px 20px;
+            border-bottom: 1px solid #00ffe7;
+            margin-bottom: 30px;
+        }
+
+        .station-title {
+            font-size: 1.6em;
+            color: #00ffe7;
+            text-shadow: 0 0 15px #00ffe7;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+        }
+
+        .station-subtitle {
+            font-size: 0.85em;
+            color: #7ecfff;
+            margin-top: 6px;
+            letter-spacing: 2px;
+        }
+
+        .heal-badge {
+            display: inline-block;
+            margin-top: 12px;
+            background: linear-gradient(135deg, #001f3f, #003366);
+            border: 1px solid #00ffe7;
+            border-radius: 20px;
+            padding: 5px 18px;
+            font-size: 0.75em;
+            color: #00ffe7;
+            letter-spacing: 1px;
+        }
+
+        .score-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(0, 255, 231, 0.05);
+            border: 1px solid #00ffe733;
+            border-radius: 10px;
+            padding: 10px 20px;
+            margin-bottom: 25px;
+            font-size: 0.8em;
+            color: #7ecfff;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .score-val {
+            color: #00ffe7;
+            font-weight: bold;
+            font-size: 1.1em;
+        }
+
+        .status-board {
+            background: rgba(0, 20, 40, 0.8);
+            border: 1px solid #00ffe755;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 25px;
+        }
+
+        .status-board h3 {
+            color: #00ffe7;
+            font-size: 0.85em;
+            letter-spacing: 2px;
+            margin-bottom: 14px;
+            text-transform: uppercase;
+        }
+
+        .status-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.82em;
+        }
+
+        .status-table th {
+            color: #7ecfff;
+            text-align: left;
+            padding: 6px 10px;
+            border-bottom: 1px solid #00ffe733;
+        }
+
+        .status-table td {
+            padding: 8px 10px;
+            border-bottom: 1px solid #ffffff11;
+        }
+
+        .status-controlled { color: #00ff88; }
+        .status-active { color: #ff4444; animation: blink 1s infinite; }
+        .status-pending { color: #ffaa00; }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        .scene-card {
+            background: rgba(0, 10, 30, 0.9);
+            border: 1px solid #00ffe755;
+            border-radius: 14px;
+            padding: 28px;
+            margin-bottom: 25px;
+            animation: fadeIn 0.6s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .scene-title {
+            font-size: 1.2em;
+            color: #ffcc00;
+            text-shadow: 0 0 10px #ffcc0088;
+            margin-bottom: 6px;
+            letter-spacing: 1px;
+        }
+
+        .scene-subtitle {
+            font-size: 0.78em;
+            color: #7ecfff;
+            letter-spacing: 2px;
+            margin-bottom: 20px;
+            text-transform: uppercase;
+        }
+
+        .patient-profile {
+            background: rgba(0, 255, 231, 0.04);
+            border: 1px solid #00ffe733;
+            border-radius: 8px;
+            padding: 16px;
+            font-size: 0.8em;
+            margin-bottom: 20px;
+            line-height: 1.9;
+            color: #b0d4e8;
+        }
+
+        .profile-title {
+            color: #00ffe7;
+            font-size: 0.85em;
+            letter-spacing: 2px;
+            margin-bottom: 10px;
+        }
+
+        .profile-row {
+            display: flex;
+            gap: 10px;
+        }
+
+        .profile-label {
+            color: #7ecfff;
+            min-width: 120px;
+        }
+
+        .heal-speech {
+            background: linear-gradient(135deg, rgba(0,50,80,0.6), rgba(0,30,60,0.6));
+            border-left: 3px solid #00ffe7;
+            border-radius: 0 10px 10px 0;
+            padding: 14px 18px;
+            margin-bottom: 22px;
+            font-size: 0.85em;
+            color: #c8eeff;
+            font-style: italic;
+            line-height: 1.7;
+        }
+
+        .heal-label {
+            color: #00ffe7;
+            font-style: normal;
+            font-size: 0.78em;
+            letter-spacing: 1px;
+            margin-bottom: 6px;
+            display: block;
+        }
+
+        .question-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .question-number {
+            background: #00ffe722;
+            border: 1px solid #00ffe7;
+            border-radius: 20px;
+            padding: 4px 14px;
+            font-size: 0.75em;
+            color: #00ffe7;
+            letter-spacing: 1px;
+        }
+
+        .scene-badge {
+            background: #ffcc0022;
+            border: 1px solid #ffcc00;
+            border-radius: 20px;
+            padding: 4px 14px;
+            font-size: 0.75em;
+            color: #ffcc00;
+        }
+
+        .question-text {
+            font-size: 0.95em;
+            color: #e8f4ff;
+            line-height: 1.7;
+            margin-bottom: 22px;
+        }
+
+        .options-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .option-btn {
+            background: rgba(0, 30, 60, 0.7);
+            border: 1px solid #00ffe744;
+            border-radius: 10px;
+            padding: 14px 18px;
+            color: #c8eeff;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85em;
+            cursor: pointer;
+            text-align: left;
+            transition: all 0.25s ease;
+            line-height: 1.5;
+        }
+
+        .option-btn:hover:not(:disabled) {
+            background: rgba(0, 255, 231, 0.1);
+            border-color: #00ffe7;
+            color: #ffffff;
+            transform: translateX(4px);
+            box-shadow: 0 0 12px #00ffe733;
+        }
+
+        .option-btn.correct {
+            background: rgba(0, 255, 136, 0.15);
+            border-color: #00ff88;
+            color: #00ff88;
+            box-shadow: 0 0 15px #00ff8844;
+        }
+
+        .option-btn.wrong {
+            background: rgba(255, 68, 68, 0.12);
+            border-color: #ff4444;
+            color: #ff8888;
+        }
+
+        .option-btn.reveal-correct {
+            background: rgba(0, 255, 136, 0.08);
+            border-color: #00ff8866;
+            color: #00ff8899;
+        }
+
+        .option-btn:disabled {
+            cursor: not-allowed;
+        }
+
+        .option-letter {
+            color: #00ffe7;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+
+        .feedback-box {
+            border-radius: 10px;
+            padding: 16px 20px;
+            margin-top: 16px;
+            font-size: 0.85em;
+            line-height: 1.7;
+            animation: fadeIn 0.4s ease;
+        }
+
+        .feedback-correct {
+            background: rgba(0, 255, 136, 0.08);
+            border: 1px solid #00ff8866;
+            color: #a0ffcc;
+        }
+
+        .feedback-wrong {
+            background: rgba(255, 68, 68, 0.08);
+            border: 1px solid #ff444466;
+            color: #ffaaaa;
+        }
+
+        .feedback-title {
+            font-size: 1em;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+
+        .feedback-correct .feedback-title { color: #00ff88; }
+        .feedback-wrong .feedback-title { color: #ff6666; }
+
+        .rationale-box {
+            background: rgba(0, 100, 150, 0.15);
+            border: 1px solid #7ecfff44;
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-top: 12px;
+            font-size: 0.82em;
+            color: #b0d4e8;
+            line-height: 1.7;
+        }
+
+        .rationale-label {
+            color: #7ecfff;
+            font-size: 0.8em;
+            letter-spacing: 1px;
+            margin-bottom: 6px;
+            display: block;
+        }
+
+        .next-btn {
+            background: linear-gradient(135deg, #003366, #005599);
+            border: 1px solid #00ffe7;
+            border-radius: 10px;
+            padding: 12px 28px;
+            color: #00ffe7;
+            font-family: 'Courier New', monospace;
+            font-size: 0.88em;
+            cursor: pointer;
+            letter-spacing: 1px;
+            margin-top: 18px;
+            transition: all 0.25s ease;
+            display: none;
+        }
+
+        .next-btn:hover {
+            background: linear-gradient(135deg, #004488, #0077bb);
+            box-shadow: 0 0 20px #00ffe744;
+            transform: translateY(-2px);
+        }
+
+        .alert-box {
+            background: rgba(255, 68, 0, 0.08);
+            border: 1px solid #ff440066;
+            border-radius: 10px;
+            padding: 16px 20px;
+            margin-bottom: 20px;
+            font-size: 0.82em;
+            color: #ffaa88;
+            line-height: 1.7;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 5px #ff440033; }
+            50% { box-shadow: 0 0 20px #ff440066; }
+        }
+
+        .alert-title {
+            color: #ff6644;
+            font-size: 0.85em;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+        }
+
+        .progress-container {
+            margin-bottom: 20px;
+        }
+
+        .progress-label {
+            font-size: 0.75em;
+            color: #7ecfff;
+            letter-spacing: 1px;
+            margin-bottom: 6px;
+        }
+
+        .progress-track {
+            background: #001a33;
+            border-radius: 10px;
+            height: 8px;
+            overflow: hidden;
+            border: 1px solid #00ffe733;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00ffe7, #0088ff);
+            border-radius: 10px;
+            transition: width 0.5s ease;
+            box-shadow: 0 0 8px #00ffe7;
+        }
+
+        .transition-scene {
+            text-align: center;
+            padding: 30px 20px;
+            animation: fadeIn 0.8s ease;
+        }
+
+        .transition-icon {
+            font-size: 3em;
+            margin-bottom: 16px;
+            animation: float 3s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        .transition-title {
+            font-size: 1.3em;
+            color: #00ffe7;
+            text-shadow: 0 0 15px #00ffe7;
+            margin-bottom: 10px;
+            letter-spacing: 2px;
+        }
+
+        .transition-text {
+            font-size: 0.85em;
+            color: #b0d4e8;
+            line-height: 1.8;
+            max-width: 600px;
+            margin: 0 auto 20px;
+        }
+
+        .final-score-card {
+            text-align: center;
+            padding: 40px 20px;
+            animation: fadeIn 0.8s ease;
+        }
+
+        .final-score-title {
+            font-size: 1.5em;
+            color: #ffcc00;
+            text-shadow: 0 0 20px #ffcc00;
+            letter-spacing: 3px;
+            margin-bottom: 10px;
+        }
+
+        .final-score-number {
+            font-size: 4em;
+            color: #00ffe7;
+            text-shadow: 0 0 30px #00ffe7;
+            margin: 20px 0;
+        }
+
+        .final-score-label {
+            font-size: 0.85em;
+            color: #7ecfff;
+            letter-spacing: 2px;
+            margin-bottom: 30px;
+        }
+
+        .rank-badge {
+            display: inline-block;
+            padding: 10px 30px;
+            border-radius: 30px;
+            font-size: 1em;
+            letter-spacing: 2px;
+            margin-bottom: 25px;
+        }
+
+        .rank-gold {
+            background: rgba(255, 204, 0, 0.15);
+            border: 2px solid #ffcc00;
+            color: #ffcc00;
+            box-shadow: 0 0 20px #ffcc0044;
+        }
+
+        .rank-silver {
+            background: rgba(192, 192, 192, 0.15);
+            border: 2px solid #c0c0c0;
+            color: #c0c0c0;
+        }
+
+        .rank-bronze {
+            background: rgba(205, 127, 50, 0.15);
+            border: 2px solid #cd7f32;
+            color: #cd7f32;
+        }
+
+        .restart-btn {
+            background: linear-gradient(135deg, #003366, #005599);
+            border: 2px solid #00ffe7;
+            border-radius: 12px;
+            padding: 14px 36px;
+            color: #00ffe7;
+            font-family: 'Courier New', monospace;
+            font-size: 0.95em;
+            cursor: pointer;
+            letter-spacing: 2px;
+            transition: all 0.3s ease;
+            margin-top: 10px;
+        }
+
+        .restart-btn:hover {
+            background: linear-gradient(135deg, #004488, #0077bb);
+            box-shadow: 0 0 25px #00ffe766;
+            transform: translateY(-3px);
+        }
+
+        .score-summary {
+            background: rgba(0, 255, 231, 0.04);
+            border: 1px solid #00ffe733;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: left;
+        }
+
+        .score-summary-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            border-bottom: 1px solid #ffffff11;
+            font-size: 0.82em;
+            color: #b0d4e8;
+        }
+
+        .score-summary-row:last-child { border-bottom: none; }
+        .score-summary-row span:last-child { color: #00ffe7; }
+
+        .divider {
+            border: none;
+            border-top: 1px solid #00ffe722;
+            margin: 20px 0;
+        }
+
+        @media (max-width: 600px) {
+            .station-title { font-size: 1.1em; }
+            .scene-card { padding: 18px; }
+            .final-score-number { font-size: 2.8em; }
+            .score-bar { font-size: 0.72em; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="stars" id="stars"></div>
+
+<div class="container">
+    <div class="station-header">
+        <div class="station-title">🌌 SKH Sentinel Station</div>
+        <div class="station-subtitle">Wound Prevention Command — Year 2050</div>
+        <div class="heal-badge">⚡ H.E.A.L. AI Unit Online</div>
+    </div>
+
+    <div class="score-bar">
+        <span>SCORE: <span class="score-val" id="scoreDisplay">0</span></span>
+        <span>SCENE: <span class="score-val" id="sceneDisplay">1 of 2</span></span>
+        <span>CORRECT: <span class="score-val" id="correctDisplay">0 / 6</span></span>
+    </div>
+
+    <div class="status-board">
+        <h3>📡 Patient Status Board</h3>
+        <table class="status-table">
+            <thead>
+                <tr>
+                    <th>Patient</th>
+                    <th>Risk Flag</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>ALPHA</td>
+                    <td>Pressure Injury</td>
+                    <td id="alphaStatus" class="status-pending">⏳ PENDING</td>
+                </tr>
+                <tr>
+                    <td>BETA</td>
+                    <td>Moisture / Skin Barrier</td>
+                    <td id="betaStatus" class="status-pending">⏳ PENDING</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="progress-container">
+        <div class="progress-label">MISSION PROGRESS</div>
+        <div class="progress-track">
+            <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+        </div>
+    </div>
+
+    <div id="gameArea"></div>
+</div>
+
+<script>
+    // ── Starfield ──────────────────────────────────────────────────
+    const starsContainer = document.getElementById('stars');
+    for (let i = 0; i < 120; i++) {
+        const star = document.createElement('div');
+        star.classList.add('star');
+        const size = Math.random() * 2.5 + 0.5;
+        star.style.cssText = `
+            width:${size}px;height:${size}px;
+            top:${Math.random()*100}%;
+            left:${Math.random()*100}%;
+            animation-delay:${Math.random()*3}s;
+            animation-duration:${2+Math.random()*3}s;
+        `;
+        starsContainer.appendChild(star);
+    }
+
+    // ── Game Data ──────────────────────────────────────────────────
+    const gameData = {
+        scenes: [
+            {
+                id: 1,
+                title: '🚀 SCENE 1: "May the Force Be Off You"',
+                subtitle: 'Pressure Injury Prevention',
+                badge: 'PRESSURE INJURY',
+                patientProfile: {
+                    title: 'PATIENT ALPHA — CASE BRIEFING',
+                    rows: [
+                        { label: 'Condition:', value: 'Bedbound, limited mobility' },
+                        { label: 'Skin Status:', value: 'Redness over sacrum detected' },
+                        { label: 'Sensor Alert:', value: 'Prolonged pressure detected' },
+                        { label: 'Risk Level:', value: '🔴 HIGH' }
+                    ]
+                },
+                healSpeech: "Specialist, I'm detecting sustained pressure over the sacral region. Tissue damage is imminent if we don't act now. The clock is ticking — what's your call?",
+                questions: [
+                    {
+                        text: "Patient ALPHA is bedbound with redness over the sacrum. What is the MOST appropriate immediate action?",
+                        options: [
+                            { letter: 'A', text: 'Apply topical antibiotics to the area of redness.' },
+                            { letter: 'B', text: 'Initiate a repositioning schedule to offload pressure from the sacrum.' },
+                            { letter: 'C', text: 'Increase room temperature to improve circulation.' },
+                            { letter: 'D', text: 'Encourage oral food and fluids intake only.' }
+                        ],
+                        correct: 1,
+                        rationale: "Offloading pressure is the first-line prevention strategy. Repositioning relieves sustained pressure on vulnerable tissue, preventing progression from redness to a full pressure injury. Topical antibiotics are not indicated for non-infected redness, and temperature or nutrition alone will not address the immediate mechanical cause."
+                    },
+                    {
+                        text: "Which factor contributes MOST directly to pressure injury (PI) development?",
+                        options: [
+                            { letter: 'A', text: 'Malnutrition alone.' },
+                            { letter: 'B', text: 'Sustained shear and friction only.' },
+                            { letter: 'C', text: 'Incontinence alone.' },
+                            { letter: 'D', text: 'Low oxygen levels alone.' },
+                            { letter: 'E', text: 'Sustained pressure and shear acting together on tissue.' }
+                        ],
+                        correct: 4,
+                        rationale: "The primary mechanical cause of pressure injuries is sustained pressure combined with shear forces, which compress and distort soft tissue between a bony prominence and an external surface. While malnutrition, incontinence, and low oxygen are contributing risk factors, they are not the direct mechanical cause. Sustained pressure and shear together are the defining pathophysiological drivers."
+                    },
+                    {
+                        text: "Which intervention is BEST PRACTICE for sacral pressure redistribution and PI prevention in an adult at risk?",
+                        options: [
+                            { letter: 'A', text: 'Use a pressure-redistributing mattress alone — support surfaces replace the need for repositioning.' },
+                            { letter: 'B', text: 'Reposition the patient based on individualised assessment to optimise pressure redistribution and tissue tolerance, while using an appropriate pressure-redistributing support surface.' },
+                            { letter: 'C', text: "Maintain the patient in a semi-Fowler's position (45°) for most of the day to enhance comfort." },
+                            { letter: 'D', text: 'Massage the pressure points every shift to improve local circulation.' }
+                        ],
+                        correct: 1,
+                        rationale: "The 2025 International Clinical Practice Guideline (NPIAP/EPUAP/PPPIA) states that individuals at risk of PIs should be repositioned regardless of the support surface used. Repositioning and support surfaces must be used together as part of a comprehensive prevention strategy. Semi-Fowler's at 45° increases shear forces, and massage over bony prominences is contraindicated as it can cause further tissue damage."
+                    }
+                ],
+                transitionTitle: "🎉 Pressure Risk Controlled!",
+                transitionText: "Excellent work, Specialist! The sacral redness has faded. Patient ALPHA's pressure risk is now controlled. H.E.A.L. is updating the patient record... But the station never rests. A new moisture alert has been detected for Patient BETA.",
+                transitionAlert: "⚠️ H.E.A.L. WARNING: Skin barrier compromise predicted in 12 hours. Excessive moisture detected in perineal area."
+            },
+            {
+                id: 2,
+                title: '🌊 SCENE 2: "Splash Zone — The Moisture Menace"',
+                subtitle: 'Moisture-Associated Skin Damage (MASD)',
+                badge: 'MASD',
+                patientProfile: {
+                    title: 'PATIENT BETA — CASE BRIEFING',
+                    rows: [
+                        { label: 'Age:', value: '78 years old' },
+                        { label: 'Condition:', value: 'Post-op Day 2, limited mobility' },
+                        { label: 'Continence:', value: 'Double incontinence (urine + faeces)' },
+                        { label: 'Skin Status:', value: 'Perineal erythema developing' },
+                        { label: 'Moisture:', value: 'Prolonged exposure detected' },
+                        { label: 'Risk Level:', value: '🔴 HIGH' }
+                    ]
+                },
+                healSpeech: "Moisture is a silent destroyer, Specialist. Unlike pressure injuries, MASD develops from the outside in — skin softens, breaks down, and becomes a gateway for infection. You have a narrow window. Choose wisely.",
+                questions: [
+                    {
+                        text: "The perineal erythema is worsening. What is the MOST important first step in managing Patient BETA's skin right now?",
+                        options: [
+                            { letter: 'A', text: 'Apply a thick layer of talcum powder to absorb the moisture and keep the area dry.' },
+                            { letter: 'B', text: 'Cleanse the perineal area with a pH-balanced skin cleanser, apply a moisture barrier product, and implement a structured skin care regimen.' },
+                            { letter: 'C', text: 'Leave the area exposed to air-dry naturally and reassess in 6 hours.' },
+                            { letter: 'D', text: 'Apply a hydrocolloid dressing over the entire perineal area immediately.' }
+                        ],
+                        correct: 1,
+                        rationale: "The cornerstone of MASD prevention and management is a structured skin care regimen: cleanse with a pH-balanced cleanser to remove irritants without disrupting the acid mantle, then apply a moisture barrier product to protect the skin from further moisture exposure. Talcum powder can cake and cause friction. Air-drying delays treatment. Hydrocolloid dressings are not appropriate for the entire perineal area in an incontinent patient."
+                    },
+                    {
+                        text: "Which of the following BEST describes Moisture-Associated Skin Damage (MASD) and differentiates it from a pressure injury?",
+                        options: [
+                            { letter: 'A', text: 'MASD always presents with necrotic tissue and is caused by sustained pressure over bony prominences.' },
+                            { letter: 'B', text: 'MASD is caused by prolonged exposure to moisture sources such as urine, faeces, or wound exudate, and typically presents with diffuse, superficial erythema without necrosis, often in skin folds or perineal areas.' },
+                            { letter: 'C', text: 'MASD and pressure injuries are clinically identical and require the same treatment approach.' },
+                            { letter: 'D', text: 'MASD only occurs in patients with diabetes and is unrelated to incontinence.' }
+                        ],
+                        correct: 1,
+                        rationale: "MASD is caused by prolonged skin exposure to moisture (urine, faeces, sweat, wound exudate), leading to skin maceration and disruption of the skin barrier. It typically presents as diffuse, irregular redness in perineal or skin fold areas — without the defined wound edges or necrosis seen in pressure injuries. Distinguishing MASD from pressure injuries is critical because their management differs significantly."
+                    },
+                    {
+                        text: "Patient BETA continues to have double incontinence. Which comprehensive strategy BEST prevents ongoing MASD?",
+                        options: [
+                            { letter: 'A', text: 'Apply a barrier cream once daily after the morning wash only.' },
+                            { letter: 'B', text: 'Implement a structured skin care regimen: cleanse after each incontinence episode, apply a skin protectant/barrier product, manage incontinence with appropriate containment products, and reassess skin integrity regularly.' },
+                            { letter: 'C', text: 'Use adult diapers at maximum absorbency and change only twice daily to minimise skin disturbance.' },
+                            { letter: 'D', text: 'Apply a thick layer of zinc oxide paste permanently and avoid cleansing to preserve the barrier.' }
+                        ],
+                        correct: 1,
+                        rationale: "Comprehensive MASD prevention requires a structured, consistent approach: prompt cleansing after each incontinence episode to remove irritants, application of a skin protectant or barrier product to shield the skin, use of appropriate incontinence containment products to reduce moisture contact time, and regular skin reassessment. Once-daily care is insufficient for double incontinence. Avoiding cleansing allows irritants to remain in contact with skin, worsening damage."
+                    }
+                ],
+               transitionTitle: "🏆 Mission Complete — All Patients Stabilised!",
+transitionText: "Outstanding work, Specialist. Both patients are stable. SKH Sentinel Station is secure.",
+transitionAlert: null            }
+        ]
+    };
+
+    // ── Game State ─────────────────────────────────────────────────
+    let currentScene = 0;
+    let currentQuestion = 0;
+    let score = 0;
+    let correctCount = 0;
+    let totalQuestions = 0;
+
+    // Count total questions
+    gameData.scenes.forEach(s => totalQuestions += s.questions.length);
+
+    // ── Render Functions ───────────────────────────────────────────
+    function updateScoreBar() {
+        document.getElementById('scoreDisplay').textContent = score;
+        document.getElementById('sceneDisplay').textContent = `${currentScene + 1} of ${gameData.scenes.length}`;
+        document.getElementById('correctDisplay').textContent = `${correctCount} / ${totalQuestions}`;
+    }
+
+    function updateProgress() {
+        const answered = currentScene * gameData.scenes[0].questions.length + currentQuestion;
+        const pct = Math.round((answered / totalQuestions) * 100);
+        document.getElementById('progressFill').style.width = pct + '%';
+    }
+
+    function updateStatusBoard() {
+        const statuses = ['alphaStatus', 'betaStatus'];
+        statuses.forEach((id, i) => {
+            const el = document.getElementById(id);
+            if (i < currentScene) {
+                el.className = 'status-controlled';
+                el.textContent = '✅ CONTROLLED';
+            } else if (i === currentScene) {
+                el.className = 'status-active';
+                el.textContent = '🔴 ACTIVE';
+            }
+        });
+    }
+
+    function renderQuestion() {
+        const scene = gameData.scenes[currentScene];
+        const q = scene.questions[currentQuestion];
+        const qNum = currentQuestion + 1;
+        const qTotal = scene.questions.length;
+
+        updateScoreBar();
+        updateProgress();
+        updateStatusBoard();
+
+        const optionsHTML = q.options.map((opt, i) => `
+            <button class="option-btn" onclick="selectAnswer(${i})" id="opt${i}">
+                <span class="option-letter">${opt.letter}.</span>${opt.text}
+            </button>
+        `).join('');
+
+        document.getElementById('gameArea').innerHTML = `
+            <div class="scene-card">
+                <div class="scene-title">${scene.title}</div>
+                <div class="scene-subtitle">${scene.subtitle}</div>
+
+                ${currentQuestion === 0 ? `
+                <div class="patient-profile">
+                    <div class="profile-title">📋 ${scene.patientProfile.title}</div>
+                    ${scene.patientProfile.rows.map(r => `
+                        <div class="profile-row">
+                            <span class="profile-label">${r.label}</span>
+                            <span>${r.value}</span>
+                        </div>
+                    `).join('')}
+                </div>
+                <div class="heal-speech">
+                    <span class="heal-label">⚡ H.E.A.L. AI:</span>
+                    ${scene.healSpeech}
+                </div>
+                ` : ''}
+
+                <div class="question-header">
+                    <span class="question-number">Q${qNum} of ${qTotal}</span>
+                    <span class="scene-badge">${scene.badge}</span>
+                </div>
+
+                <div class="question-text">${q.text}</div>
+
+                <div class="options-grid" id="optionsGrid">
+                    ${optionsHTML}
+                </div>
+
+                <div id="feedbackArea"></div>
+                <button class="next-btn" id="nextBtn" onclick="nextStep()">
+                    ${currentQuestion < qTotal - 1 ? '▶ NEXT QUESTION' : currentScene < gameData.scenes.length - 1 ? '▶ PROCEED TO NEXT SCENE' : '▶ VIEW FINAL RESULTS'}
+                </button>
+            </div>
+        `;
+    }
+
+    function selectAnswer(index) {
+        const scene = gameData.scenes[currentScene];
+        const q = scene.questions[currentQuestion];
+        const buttons = document.querySelectorAll('.option-btn');
+
+        buttons.forEach(btn => btn.disabled = true);
+
+        const isCorrect = index === q.correct;
+        if (isCorrect) {
+            score += 10;
+            correctCount++;
+            buttons[index].classList.add('correct');
+        } else {
+            buttons[index].classList.add('wrong');
+            buttons[q.correct].classList.add('reveal-correct');
+        }
+
+        updateScoreBar();
+
+        const feedbackArea = document.getElementById('feedbackArea');
+        feedbackArea.innerHTML = `
+            <div class="feedback-box ${isCorrect ? 'feedback-correct' : 'feedback-wrong'}">
+                <div class="feedback-title">${isCorrect ? '✅ CORRECT — Well done, Specialist!' : '❌ INCORRECT — Review required.'}</div>
+                <div class="rationale-box">
+                    <span class="rationale-label">📖 CLINICAL RATIONALE:</span>
+                    ${q.rationale}
+                </div>
+            </div>
+        `;
+
+        document.getElementById('nextBtn').style.display = 'inline-block';
+    }
+
+    function nextStep() {
+        const scene = gameData.scenes[currentScene];
+
+        if (currentQuestion < scene.questions.length - 1) {
+            currentQuestion++;
+            renderQuestion();
+        } else if (currentScene < gameData.scenes.length - 1) {
+            showTransition();
+        } else {
+            showFinalScore();
+        }
+    }
+
+    function showTransition() {
+        const scene = gameData.scenes[currentScene];
+
+        // Mark current scene patient as controlled
+        const statusIds = ['alphaStatus', 'betaStatus'];
+        const el = document.getElementById(statusIds[currentScene]);
+        el.className = 'status-controlled';
+        el.textContent = '✅ CONTROLLED';
+
+        document.getElementById('gameArea').innerHTML = `
+            <div class="scene-card">
+                <div class="transition-scene">
+                    <div class="transition-icon">🌟</div>
+                    <div class="transition-title">${scene.transitionTitle}</div>
+                    <div class="transition-text">${scene.transitionText}</div>
+                    ${scene.transitionAlert ? `
+                    <div class="alert-box">
+                        <div class="alert-title">⚠️ INCOMING ALERT</div>
+                        ${scene.transitionAlert}
+                    </div>` : ''}
+                    <button class="next-btn" style="display:inline-block;" onclick="loadNextScene()">
+                        ▶ RESPOND TO ALERT
+                    </button>
+                </div>
+            </div>
+        `;
+
+        updateProgress();
+    }
+
+    function loadNextScene() {
+        currentScene++;
+        currentQuestion = 0;
+        renderQuestion();
+    }
+
+    function showFinalScore() {
+        // Mark last patient as controlled
+        const statusIds = ['alphaStatus', 'betaStatus'];
+        const el = document.getElementById(statusIds[currentScene]);
+        el.className = 'status-controlled';
+        el.textContent = '✅ CONTROLLED';
+
+        document.getElementById('progressFill').style.width = '100%';
+
+        const pct = Math.round((correctCount / totalQuestions) * 100);
+        let rankClass, rankLabel;
+        if (pct >= 80) { rankClass = 'rank-gold'; rankLabel = '🥇 GOLD — SENTINEL COMMANDER'; }
+        else if (pct >= 60) { rankClass = 'rank-silver'; rankLabel = '🥈 SILVER — WOUND SPECIALIST'; }
+        else { rankClass = 'rank-bronze'; rankLabel = '🥉 BRONZE — FIELD MEDIC'; }
+
+        document.getElementById('gameArea').innerHTML = `
+            <div class="scene-card">
+                <div class="final-score-card">
+                    <div class="final-score-title">🏆 MISSION COMPLETE</div>
+                    <div class="final-score-number">${score}</div>
+                    <div class="final-score-label">TOTAL SCORE</div>
+                    <div class="rank-badge ${rankClass}">${rankLabel}</div>
+                    <div class="score-summary">
+                        <div class="score-summary-row">
+                            <span>Questions Answered</span>
+                            <span>${totalQuestions}</span>
+                        </div>
+                        <div class="score-summary-row">
+                            <span>Correct Answers</span>
+                            <span>${correctCount}</span>
+                        </div>
+                        <div class="score-summary-row">
+                            <span>Accuracy</span>
+                            <span>${pct}%</span>
+                        </div>
+                        <div class="score-summary-row">
+                            <span>Final Score</span>
+                            <span>${score} pts</span>
+                        </div>
+                    </div>
+                    <hr class="divider">
+                    <div class="transition-text">
+                        All patients stabilised. SKH Sentinel Station stands secure. 
+                        Your clinical decisions today have protected lives — well done, Specialist.
+                    </div>
+                    <button class="restart-btn" onclick="restartGame()">↺ RESTART MISSION</button>
+                </div>
+            </div>
+        `;
+    }
+
+    function restartGame() {
+        currentScene = 0;
+        currentQuestion = 0;
+        score = 0;
+        correctCount = 0;
+
+        // Reset status board
+        document.getElementById('alphaStatus').className = 'status-pending';
+        document.getElementById('alphaStatus').textContent = '⏳ PENDING';
+        document.getElementById('betaStatus').className = 'status-pending';
+        document.getElementById('betaStatus').textContent = '⏳ PENDING';
+
+        document.getElementById('progressFill').style.width = '0%';
+        updateScoreBar();
+        renderQuestion();
+    }
+
+    // ── Init ───────────────────────────────────────────────────────
+    renderQuestion();
+
+</script>
+</body>
+</html>

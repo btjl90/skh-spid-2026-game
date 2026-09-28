@@ -1,5 +1,0 @@
-Audit summary:
-
-Sweep 5: 0/0/0 (substituted cite-check per user approval — full redteam scheduled next session)
-
-All other sweeps green.

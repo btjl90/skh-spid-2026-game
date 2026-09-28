@@ -1,1 +1,0 @@
-gh issue list --repo $(gh repo view --json nameWithOwner -q .nameWithOwner) --state open

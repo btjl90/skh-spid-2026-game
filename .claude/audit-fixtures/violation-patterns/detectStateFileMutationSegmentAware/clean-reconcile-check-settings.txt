@@ -1,1 +1,0 @@
-node .claude/bin/reconcile-settings-deny.mjs --check .claude/settings.json

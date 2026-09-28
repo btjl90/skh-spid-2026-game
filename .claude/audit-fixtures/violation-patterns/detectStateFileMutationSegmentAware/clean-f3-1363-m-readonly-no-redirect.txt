@@ -1,1 +1,0 @@
-cat .claude/settings.json && node /tmp/a/other.js

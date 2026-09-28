@@ -1,1 +1,0 @@
-git config include.path /tmp/evil.cfg

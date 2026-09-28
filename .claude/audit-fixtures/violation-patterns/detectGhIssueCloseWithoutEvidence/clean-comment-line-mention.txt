@@ -1,1 +1,0 @@
-# gh issue close 1687 is what this detector watches for

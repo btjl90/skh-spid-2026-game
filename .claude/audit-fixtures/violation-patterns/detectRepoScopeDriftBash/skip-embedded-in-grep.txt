@@ -1,1 +1,0 @@
-grep -rn "gh issue create --repo terrene-foundation/kailash-py" .claude/rules/

@@ -1,1 +1,0 @@
-ruby -e 'printf("%x/%x\n", File.read(".claude/learning/posture.json").size, 2)'

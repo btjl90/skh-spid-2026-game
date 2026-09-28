@@ -1,1 +1,0 @@
-gh issue close 1687 --comment `git rev-parse HEAD`

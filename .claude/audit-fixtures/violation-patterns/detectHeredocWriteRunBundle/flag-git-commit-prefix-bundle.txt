@@ -1,4 +1,0 @@
-git commit -m wip && cat > s.cjs <<EOF
-fs.writeFileSync(".claude/learning/posture.json", "{}");
-EOF
-node s.cjs

@@ -1,1 +1,0 @@
-The --list-all fix worked; the Ruby gem is publishing now.

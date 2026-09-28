@@ -1,4 +1,0 @@
-cat <<'EOF' | sponge s.cjs
-require("fs").writeFileSync(".claude/learning/posture.json", "{}");
-EOF
-node s.cjs

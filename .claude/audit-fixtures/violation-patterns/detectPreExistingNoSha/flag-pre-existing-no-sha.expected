@@ -1,5 +1,0 @@
-{
-  "rule_id": "zero-tolerance/Rule-1c",
-  "severity": "halt-and-report",
-  "evidence_substring": "pre-existing"
-}

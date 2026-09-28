@@ -1,1 +1,0 @@
-node probe.mjs >| /tmp/run.log && wc -l .claude/learning/posture.json

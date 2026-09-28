@@ -1,1 +1,0 @@
-git commit -m "document .claude/learning/posture.json write path"

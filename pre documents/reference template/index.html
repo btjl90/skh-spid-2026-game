@@ -1,0 +1,910 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SKH Sentinel Station — Wound Prevention Command</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #000814;
+            color: #e0e0e0;
+            font-family: 'Courier New', monospace;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .stars {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .star {
+            position: absolute;
+            background: white;
+            border-radius: 50%;
+            animation: twinkle 3s infinite alternate;
+        }
+
+        @keyframes twinkle {
+            0% { opacity: 0.2; }
+            100% { opacity: 1; }
+        }
+
+        /* ── LANDING PAGE ── */
+        .landing {
+            position: relative;
+            z-index: 1;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 20px;
+        }
+
+        .logo-ring {
+            width: 110px;
+            height: 110px;
+            border-radius: 50%;
+            border: 2px solid #00ffe7;
+            box-shadow: 0 0 30px #00ffe766, inset 0 0 30px #00ffe711;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 3em;
+            margin-bottom: 28px;
+            animation: rotatePulse 6s linear infinite;
+        }
+
+        @keyframes rotatePulse {
+            0%   { box-shadow: 0 0 20px #00ffe766, inset 0 0 20px #00ffe711; }
+            50%  { box-shadow: 0 0 50px #00ffe7cc, inset 0 0 40px #00ffe733; }
+            100% { box-shadow: 0 0 20px #00ffe766, inset 0 0 20px #00ffe711; }
+        }
+
+        .landing-title {
+            font-size: 2em;
+            color: #00ffe7;
+            text-shadow: 0 0 20px #00ffe7;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            text-align: center;
+            margin-bottom: 8px;
+            animation: fadeSlideDown 0.8s ease both;
+        }
+
+        .landing-subtitle {
+            font-size: 0.85em;
+            color: #7ecfff;
+            letter-spacing: 3px;
+            text-align: center;
+            margin-bottom: 6px;
+            animation: fadeSlideDown 0.9s ease both;
+        }
+
+        .landing-year {
+            font-size: 0.75em;
+            color: #00ffe799;
+            letter-spacing: 2px;
+            text-align: center;
+            margin-bottom: 36px;
+            animation: fadeSlideDown 1s ease both;
+        }
+
+        @keyframes fadeSlideDown {
+            from { opacity: 0; transform: translateY(-20px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        .divider-line {
+            width: 100%;
+            max-width: 500px;
+            border: none;
+            border-top: 1px solid #00ffe733;
+            margin-bottom: 36px;
+        }
+
+        /* Mission briefing card */
+        .briefing-card {
+            background: rgba(0, 10, 30, 0.85);
+            border: 1px solid #00ffe755;
+            border-radius: 16px;
+            padding: 30px 32px;
+            max-width: 620px;
+            width: 100%;
+            margin-bottom: 30px;
+            animation: fadeIn 1.1s ease both;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        .briefing-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 18px;
+        }
+
+        .briefing-icon {
+            font-size: 1.4em;
+        }
+
+        .briefing-title {
+            color: #ffcc00;
+            font-size: 0.85em;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            text-shadow: 0 0 8px #ffcc0066;
+        }
+
+        .briefing-text {
+            font-size: 0.83em;
+            color: #b0d4e8;
+            line-height: 1.9;
+            margin-bottom: 22px;
+        }
+
+        .briefing-text strong {
+            color: #00ffe7;
+        }
+
+        /* Mission stats row */
+        .mission-stats {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 4px;
+        }
+
+        .stat-chip {
+            background: rgba(0, 255, 231, 0.06);
+            border: 1px solid #00ffe744;
+            border-radius: 20px;
+            padding: 6px 16px;
+            font-size: 0.75em;
+            color: #7ecfff;
+            letter-spacing: 1px;
+        }
+
+        .stat-chip span {
+            color: #00ffe7;
+            font-weight: bold;
+        }
+
+        /* Scene preview */
+        .scenes-preview {
+            background: rgba(0, 10, 30, 0.85);
+            border: 1px solid #00ffe733;
+            border-radius: 16px;
+            padding: 24px 28px;
+            max-width: 620px;
+            width: 100%;
+            margin-bottom: 30px;
+            animation: fadeIn 1.2s ease both;
+        }
+
+        .scenes-preview-title {
+            color: #00ffe7;
+            font-size: 0.78em;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            margin-bottom: 18px;
+        }
+
+        .scene-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 16px;
+            padding: 14px 0;
+            border-bottom: 1px solid #ffffff0d;
+        }
+
+        .scene-row:last-child {
+            border-bottom: none;
+            padding-bottom: 0;
+        }
+
+        .scene-num {
+            background: #00ffe722;
+            border: 1px solid #00ffe7;
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8em;
+            color: #00ffe7;
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+
+        .scene-info-title {
+            color: #ffcc00;
+            font-size: 0.82em;
+            margin-bottom: 4px;
+            letter-spacing: 1px;
+        }
+
+        .scene-info-desc {
+            font-size: 0.76em;
+            color: #7ecfff;
+            line-height: 1.6;
+        }
+
+        .scene-tag {
+            display: inline-block;
+            background: #ffcc0018;
+            border: 1px solid #ffcc0055;
+            border-radius: 10px;
+            padding: 2px 10px;
+            font-size: 0.7em;
+            color: #ffcc00;
+            margin-top: 6px;
+        }
+
+        /* H.E.A.L. intro */
+        .heal-intro {
+            background: linear-gradient(135deg, rgba(0,50,80,0.5), rgba(0,30,60,0.5));
+            border-left: 3px solid #00ffe7;
+            border-radius: 0 12px 12px 0;
+            padding: 16px 20px;
+            max-width: 620px;
+            width: 100%;
+            margin-bottom: 32px;
+            font-size: 0.83em;
+            color: #c8eeff;
+            font-style: italic;
+            line-height: 1.8;
+            animation: fadeIn 1.3s ease both;
+        }
+
+        .heal-intro-label {
+            color: #00ffe7;
+            font-style: normal;
+            font-size: 0.78em;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        /* Launch button */
+        .launch-btn {
+            background: linear-gradient(135deg, #003366, #005599);
+            border: 2px solid #00ffe7;
+            border-radius: 14px;
+            padding: 16px 52px;
+            color: #00ffe7;
+            font-family: 'Courier New', monospace;
+            font-size: 1em;
+            cursor: pointer;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            transition: all 0.3s ease;
+            animation: fadeIn 1.4s ease both;
+            box-shadow: 0 0 20px #00ffe733;
+            margin-bottom: 16px;
+        }
+
+        .launch-btn:hover {
+            background: linear-gradient(135deg, #004488, #0077bb);
+            box-shadow: 0 0 40px #00ffe799;
+            transform: translateY(-4px) scale(1.02);
+        }
+
+        .launch-btn:active {
+            transform: translateY(-1px) scale(0.99);
+        }
+
+        .launch-hint {
+            font-size: 0.72em;
+            color: #7ecfff66;
+            letter-spacing: 1px;
+            animation: fadeIn 1.5s ease both;
+        }
+
+        /* Rank preview */
+        .rank-preview {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+            max-width: 620px;
+            width: 100%;
+            margin-top: 28px;
+            animation: fadeIn 1.5s ease both;
+        }
+
+        .rank-chip {
+            border-radius: 20px;
+            padding: 6px 18px;
+            font-size: 0.72em;
+            letter-spacing: 1px;
+        }
+
+        .rank-chip-gold   { background: rgba(255,204,0,0.1);   border: 1px solid #ffcc0066; color: #ffcc00; }
+        .rank-chip-silver { background: rgba(192,192,192,0.1); border: 1px solid #c0c0c066; color: #c0c0c0; }
+        .rank-chip-bronze { background: rgba(205,127,50,0.1);  border: 1px solid #cd7f3266; color: #cd7f32; }
+
+        /* Scanline overlay for atmosphere */
+        .scanlines {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 0;
+            pointer-events: none;
+            background: repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 2px,
+                rgba(0,0,0,0.03) 2px,
+                rgba(0,0,0,0.03) 4px
+            );
+        }
+
+        @media (max-width: 600px) {
+            .landing-title  { font-size: 1.3em; letter-spacing: 2px; }
+            .briefing-card  { padding: 20px 18px; }
+            .scenes-preview { padding: 18px; }
+            .launch-btn     { padding: 14px 36px; font-size: 0.9em; }
+            .logo-ring      { width: 85px; height: 85px; font-size: 2.2em; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="stars"   id="stars"></div>
+<div class="scanlines"></div>
+
+<div class="landing" id="landingPage">
+
+    <div class="logo-ring">🌌</div>
+
+    <div class="landing-title">SKH Sentinel Station</div>
+    <div class="landing-subtitle">Wound Prevention Command</div>
+    <div class="landing-year">⚡ YEAR 2050 — H.E.A.L. AI UNIT ONLINE</div>
+
+    <hr class="divider-line">
+
+    <!-- Mission Briefing -->
+    <div class="briefing-card">
+        <div class="briefing-header">
+            <span class="briefing-icon">📡</span>
+            <span class="briefing-title">Mission Briefing</span>
+        </div>
+        <div class="briefing-text">
+            Welcome, <strong>Specialist</strong>. You have been assigned to the SKH Sentinel Station —
+            a deep-space wound prevention command centre monitoring critically at-risk patients aboard
+            the orbital ward.<br><br>
+            Two patients have been flagged by the <strong>H.E.A.L. AI</strong> (Holistic Early Alert &amp; 
+            Learning) system. Your clinical decisions will determine whether their skin integrity holds —
+            or fails. There is no room for error out here.
+        </div>
+        <div class="mission-stats">
+            <div class="stat-chip"><span>2</span> Scenes</div>
+            <div class="stat-chip"><span>6</span> Questions</div>
+            <div class="stat-chip"><span>10 pts</span> Per Correct Answer</div>
+            <div class="stat-chip"><span>60 pts</span> Maximum Score</div>
+        </div>
+    </div>
+
+    <!-- Scene Preview -->
+    <div class="scenes-preview">
+        <div class="scenes-preview-title">📋 Mission Dossier</div>
+
+        <div class="scene-row">
+            <div class="scene-num">1</div>
+            <div>
+                <div class="scene-info-title">🚀 "May the Force Be Off You"</div>
+                <div class="scene-info-desc">
+                    Patient ALPHA is bedbound with sacral redness. Sustained pressure has been
+                    detected. You must act fast to prevent tissue breakdown.
+                </div>
+                <span class="scene-tag">PRESSURE INJURY PREVENTION</span>
+            </div>
+        </div>
+
+        <div class="scene-row">
+            <div class="scene-num">2</div>
+            <div>
+                <div class="scene-info-title">🌊 "Splash Zone — The Moisture Menace"</div>
+                <div class="scene-info-desc">
+                    Patient BETA has double incontinence and developing perineal erythema.
+                    Moisture is silently destroying the skin barrier.
+                </div>
+                <span class="scene-tag">MOISTURE-ASSOCIATED SKIN DAMAGE</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- H.E.A.L. Speech -->
+    <div class="heal-intro">
+        <span class="heal-intro-label">⚡ H.E.A.L. AI — PRE-MISSION TRANSMISSION:</span>
+        "Specialist, the station is counting on you. Every question you answer correctly
+        is a clinical decision that protects a life. Study the patient profiles carefully,
+        trust your training, and remember — in wound prevention, timing is everything.
+        Good luck out there."
+    </div>
+
+    <!-- Launch -->
+    <button class="launch-btn" onclick="launchMission()">
+        ▶ &nbsp; Launch Mission
+    </button>
+    <div class="launch-hint">— PRESS TO BEGIN DEPLOYMENT —</div>
+
+    <!-- Rank preview -->
+    <div class="rank-preview">
+        <div class="rank-chip rank-gold">🥇 80–100% · Sentinel Commander</div>
+        <div class="rank-chip rank-silver">🥈 60–79% · Wound Specialist</div>
+        <div class="rank-chip rank-bronze">🥉 &lt;60% · Field Medic</div>
+    </div>
+
+</div>
+
+<script>
+    // ── Starfield ──────────────────────────────────────────────────
+    const starsContainer = document.getElementById('stars');
+    for (let i = 0; i < 120; i++) {
+        const star = document.createElement('div');
+        star.classList.add('star');
+        const size = Math.random() * 2.5 + 0.5;
+        star.style.cssText = `
+            width:${size}px; height:${size}px;
+            top:${Math.random() * 100}%;
+            left:${Math.random() * 100}%;
+            animation-delay:${Math.random() * 3}s;
+            animation-duration:${2 + Math.random() * 3}s;
+        `;
+        starsContainer.appendChild(star);
+    }
+
+    // ── Launch ─────────────────────────────────────────────────────
+    function launchMission() {
+        const landing = document.getElementById('landingPage');
+        landing.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
+        landing.style.opacity = '0';
+        landing.style.transform = 'scale(0.97)';
+
+        setTimeout(() => {
+            // Replace this with your actual game initialisation call,
+            // or redirect to the game page:
+            // window.location.href = 'sample_game5.html';
+            alert('🚀 Mission launched! Wire this button to your game page.');
+        }, 650);
+    }
+</script>
+
+</body>
+</html>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SKH Sentinel Station — Wound Prevention Command</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #000814;
+            color: #e0e0e0;
+            font-family: 'Courier New', monospace;
+            min-height: 100vh;
+            overflow-x: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .stars {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .star {
+            position: absolute;
+            background: white;
+            border-radius: 50%;
+            animation: twinkle 3s infinite alternate;
+        }
+
+        @keyframes twinkle {
+            0% { opacity: 0.2; }
+            100% { opacity: 1; }
+        }
+
+        .container {
+            position: relative;
+            z-index: 1;
+            max-width: 860px;
+            width: 100%;
+            margin: 0 auto;
+            padding: 40px 20px;
+            text-align: center;
+        }
+
+        /* ── Logo / Emblem ── */
+        .emblem {
+            font-size: 5em;
+            margin-bottom: 10px;
+            animation: float 4s ease-in-out infinite;
+            filter: drop-shadow(0 0 20px #00ffe7);
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-12px); }
+        }
+
+        /* ── Title Block ── */
+        .station-title {
+            font-size: 2em;
+            color: #00ffe7;
+            text-shadow: 0 0 20px #00ffe7, 0 0 40px #00ffe755;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+            animation: glow 3s ease-in-out infinite alternate;
+        }
+
+        @keyframes glow {
+            0% { text-shadow: 0 0 10px #00ffe7; }
+            100% { text-shadow: 0 0 30px #00ffe7, 0 0 60px #00ffe755; }
+        }
+
+        .station-subtitle {
+            font-size: 0.9em;
+            color: #7ecfff;
+            letter-spacing: 3px;
+            margin-bottom: 6px;
+        }
+
+        .station-year {
+            font-size: 0.75em;
+            color: #3a7a9c;
+            letter-spacing: 2px;
+            margin-bottom: 30px;
+        }
+
+        /* ── HEAL Badge ── */
+        .heal-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, #001f3f, #003366);
+            border: 1px solid #00ffe7;
+            border-radius: 20px;
+            padding: 6px 22px;
+            font-size: 0.78em;
+            color: #00ffe7;
+            letter-spacing: 2px;
+            margin-bottom: 40px;
+            animation: pulse-badge 2s infinite;
+        }
+
+        @keyframes pulse-badge {
+            0%, 100% { box-shadow: 0 0 6px #00ffe744; }
+            50% { box-shadow: 0 0 18px #00ffe7aa; }
+        }
+
+        /* ── Divider ── */
+        .divider {
+            border: none;
+            border-top: 1px solid #00ffe722;
+            margin: 0 auto 40px;
+            max-width: 500px;
+        }
+
+        /* ── Mission Brief Card ── */
+        .brief-card {
+            background: rgba(0, 10, 30, 0.85);
+            border: 1px solid #00ffe755;
+            border-radius: 16px;
+            padding: 30px 36px;
+            margin-bottom: 30px;
+            text-align: left;
+            animation: fadeIn 1s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(24px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .brief-title {
+            color: #ffcc00;
+            font-size: 0.8em;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            margin-bottom: 14px;
+            text-shadow: 0 0 8px #ffcc0066;
+        }
+
+        .brief-text {
+            font-size: 0.85em;
+            color: #b0d4e8;
+            line-height: 1.9;
+            margin-bottom: 20px;
+        }
+
+        .brief-text strong {
+            color: #00ffe7;
+        }
+
+        /* ── Mission Stats ── */
+        .stats-row {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-top: 10px;
+        }
+
+        .stat-chip {
+            background: rgba(0, 255, 231, 0.06);
+            border: 1px solid #00ffe733;
+            border-radius: 8px;
+            padding: 10px 16px;
+            font-size: 0.78em;
+            color: #7ecfff;
+            flex: 1;
+            min-width: 120px;
+            text-align: center;
+            line-height: 1.6;
+        }
+
+        .stat-chip .stat-val {
+            display: block;
+            font-size: 1.4em;
+            color: #00ffe7;
+            font-weight: bold;
+            margin-bottom: 2px;
+        }
+
+        /* ── Scene Preview ── */
+        .scenes-preview {
+            display: flex;
+            gap: 14px;
+            flex-wrap: wrap;
+            margin-bottom: 30px;
+        }
+
+        .scene-chip {
+            flex: 1;
+            min-width: 200px;
+            background: rgba(0, 10, 30, 0.85);
+            border: 1px solid #00ffe733;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: left;
+            animation: fadeIn 1.2s ease;
+        }
+
+        .scene-chip-icon {
+            font-size: 1.8em;
+            margin-bottom: 8px;
+        }
+
+        .scene-chip-title {
+            font-size: 0.82em;
+            color: #ffcc00;
+            letter-spacing: 1px;
+            margin-bottom: 6px;
+        }
+
+        .scene-chip-desc {
+            font-size: 0.75em;
+            color: #7ecfff;
+            line-height: 1.6;
+        }
+
+        .scene-chip-badge {
+            display: inline-block;
+            margin-top: 10px;
+            background: #ffcc0015;
+            border: 1px solid #ffcc0055;
+            border-radius: 10px;
+            padding: 2px 10px;
+            font-size: 0.7em;
+            color: #ffcc00;
+            letter-spacing: 1px;
+        }
+
+        /* ── HEAL Intro Speech ── */
+        .heal-speech {
+            background: linear-gradient(135deg, rgba(0,50,80,0.6), rgba(0,30,60,0.6));
+            border-left: 3px solid #00ffe7;
+            border-radius: 0 12px 12px 0;
+            padding: 16px 20px;
+            margin-bottom: 30px;
+            font-size: 0.85em;
+            color: #c8eeff;
+            font-style: italic;
+            line-height: 1.8;
+            text-align: left;
+            animation: fadeIn 1.4s ease;
+        }
+
+        .heal-label {
+            color: #00ffe7;
+            font-style: normal;
+            font-size: 0.78em;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        /* ── Launch Button ── */
+        .launch-btn {
+            background: linear-gradient(135deg, #003366, #005599);
+            border: 2px solid #00ffe7;
+            border-radius: 14px;
+            padding: 18px 60px;
+            color: #00ffe7;
+            font-family: 'Courier New', monospace;
+            font-size: 1.05em;
+            cursor: pointer;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            transition: all 0.3s ease;
+            box-shadow: 0 0 20px #00ffe733;
+            animation: fadeIn 1.6s ease;
+        }
+
+        .launch-btn:hover {
+            background: linear-gradient(135deg, #004488, #0077bb);
+            box-shadow: 0 0 40px #00ffe766, 0 0 80px #00ffe722;
+            transform: translateY(-4px) scale(1.02);
+        }
+
+        .launch-btn:active {
+            transform: translateY(-1px) scale(0.99);
+        }
+
+        .launch-hint {
+            font-size: 0.72em;
+            color: #3a7a9c;
+            letter-spacing: 2px;
+            margin-top: 14px;
+        }
+
+        /* ── Footer ── */
+        .footer {
+            margin-top: 50px;
+            font-size: 0.7em;
+            color: #2a5a7a;
+            letter-spacing: 1px;
+            line-height: 2;
+        }
+
+        @media (max-width: 600px) {
+            .station-title { font-size: 1.3em; letter-spacing: 2px; }
+            .emblem { font-size: 3.5em; }
+            .brief-card { padding: 20px; }
+            .launch-btn { padding: 16px 36px; font-size: 0.9em; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="stars" id="stars"></div>
+
+<div class="container">
+
+    <!-- Emblem -->
+    <div class="emblem">🌌</div>
+
+    <!-- Title -->
+    <div class="station-title">SKH Sentinel Station</div>
+    <div class="station-subtitle">Wound Prevention Command</div>
+    <div class="station-year">YEAR 2050 — CLASSIFIED TRAINING SIMULATION</div>
+    <div class="heal-badge">⚡ H.E.A.L. AI Unit Online</div>
+
+    <hr class="divider">
+
+    <!-- Mission Brief -->
+    <div class="brief-card">
+        <div class="brief-title">📋 Mission Briefing</div>
+        <div class="brief-text">
+            Welcome, <strong>Specialist</strong>. You have been assigned to SKH Sentinel Station — 
+            the galaxy's most advanced wound prevention command centre.<br><br>
+            Two patients are at critical risk. Your clinical decisions will determine whether 
+            their skin integrity holds — or fails. H.E.A.L., your AI co-pilot, will guide you 
+            through each scenario. Answer wisely. Every choice matters.
+        </div>
+        <div class="stats-row">
+            <div class="stat-chip">
+                <span class="stat-val">2</span>
+                Scenes
+            </div>
+            <div class="stat-chip">
+                <span class="stat-val">6</span>
+                Questions
+            </div>
+            <div class="stat-chip">
+                <span class="stat-val">60</span>
+                Max Score
+            </div>
+            <div class="stat-chip">
+                <span class="stat-val">~10</span>
+                Min Duration
+            </div>
+        </div>
+    </div>
+
+    <!-- Scene Preview -->
+    <div class="scenes-preview">
+        <div class="scene-chip">
+            <div class="scene-chip-icon">🚀</div>
+            <div class="scene-chip-title">Scene 1: "May the Force Be Off You"</div>
+            <div class="scene-chip-desc">Patient ALPHA is bedbound with sacral redness. Pressure is building. Can you offload in time?</div>
+            <span class="scene-chip-badge">PRESSURE INJURY</span>
+        </div>
+        <div class="scene-chip">
+            <div class="scene-chip-icon">🌊</div>
+            <div class="scene-chip-title">Scene 2: "Splash Zone — The Moisture Menace"</div>
+            <div class="scene-chip-desc">Patient BETA has double incontinence and perineal erythema. The skin barrier is under siege.</div>
+            <span class="scene-chip-badge">MASD</span>
+        </div>
+    </div>
+
+    <!-- HEAL Speech -->
+    <div class="heal-speech">
+        <span class="heal-label">⚡ H.E.A.L. AI — PRE-MISSION TRANSMISSION:</span>
+        "Specialist, the station is counting on you. Pressure and moisture are silent threats — 
+        they don't announce themselves until the damage is done. Your knowledge is the only 
+        shield these patients have. I'll be with you every step of the way. 
+        Let's begin."
+    </div>
+
+    <!-- Launch -->
+    <button class="launch-btn" onclick="window.location.href='game.html'">
+        ▶ LAUNCH MISSION
+    </button>
+    <div class="launch-hint">— CLICK TO BEGIN SIMULATION —</div>
+
+    <!-- Footer -->
+    <div class="footer">
+        SKH SENTINEL STATION &nbsp;|&nbsp; WOUND PREVENTION COMMAND &nbsp;|&nbsp; YEAR 2050<br>
+        FOR TRAINING PURPOSES ONLY — SINGAPORE HEALTH SERVICES
+    </div>
+
+</div>
+
+<script>
+    // Starfield
+    const starsContainer = document.getElementById('stars');
+    for (let i = 0; i < 120; i++) {
+        const star = document.createElement('div');
+        star.classList.add('star');
+        const size = Math.random() * 2.5 + 0.5;
+        star.style.cssText = `
+            width:${size}px; height:${size}px;
+            top:${Math.random() * 100}%;
+            left:${Math.random() * 100}%;
+            animation-delay:${Math.random() * 3}s;
+            animation-duration:${2 + Math.random() * 3}s;
+        `;
+        starsContainer.appendChild(star);
+    }
+</script>
+
+</body>
+</html>

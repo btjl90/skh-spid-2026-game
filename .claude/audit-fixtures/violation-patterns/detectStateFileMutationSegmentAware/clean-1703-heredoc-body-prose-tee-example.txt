@@ -1,3 +1,0 @@
-cat > /tmp/loom-1703-report.md <<'EOF'
-And: echo x | tee .claude/settings.json
-EOF

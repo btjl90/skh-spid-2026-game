@@ -1,1 +1,0 @@
-gh issue close 234 --reason $(echo not_planned)

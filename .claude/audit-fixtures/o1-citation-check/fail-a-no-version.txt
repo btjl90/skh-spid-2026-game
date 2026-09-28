@@ -1,1 +1,0 @@
-per ISO 27001 §A.8.24 requires crypto policy → this rule mandates X

@@ -1,1 +1,0 @@
-git commit -m "$(rm .claude/learning/posture.json)"

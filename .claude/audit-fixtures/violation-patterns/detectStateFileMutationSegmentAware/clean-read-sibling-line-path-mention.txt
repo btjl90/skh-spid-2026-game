@@ -1,3 +1,0 @@
-node -e "console.log(1)"
-grep -rn unlink src/
-cat .claude/learning/posture.json

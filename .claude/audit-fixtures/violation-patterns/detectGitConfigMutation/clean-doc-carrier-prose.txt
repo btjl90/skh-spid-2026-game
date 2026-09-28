@@ -1,1 +1,0 @@
-gh issue create --body 'the defeat is `git config core.repositoryformatversion 99`'

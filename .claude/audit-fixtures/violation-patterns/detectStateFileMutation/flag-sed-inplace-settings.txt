@@ -1,1 +1,0 @@
-sed -i '' 's/x/y/' .claude/settings.json

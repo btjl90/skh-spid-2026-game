@@ -1,1 +1,0 @@
-xargs gh issue close --comment "done"

@@ -1,4 +1,0 @@
-cat > s.cjs <<9
-fs.writeFileSync(".claude/learning/posture.json", "{}");
-9
-node s.cjs

@@ -1,1 +1,0 @@
-PERSON_ID="$person_id" node "${TMPDIR:-/tmp}/coc-roster-register.cjs"

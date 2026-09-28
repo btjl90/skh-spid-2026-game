@@ -1,5 +1,0 @@
-{
-  "rule_id": "repo-scope-discipline/MUST-NOT-2",
-  "severity": "halt-and-report",
-  "evidence_substring": "context-switch to kailash-py"
-}

@@ -1,6 +1,0 @@
-{
-  "_doc": "Clean payload — must NOT flag. Used by test-server.mjs to verify the allow path.",
-  "tool": "shell",
-  "tool_input": { "command": "ls -la" },
-  "expected_allow": true
-}

@@ -1,1 +1,0 @@
-perl -e 'sysopen(FH,".claude/operators.roster.json",577)'

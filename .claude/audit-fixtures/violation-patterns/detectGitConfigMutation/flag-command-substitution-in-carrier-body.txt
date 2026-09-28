@@ -1,1 +1,0 @@
-gh issue create --body "$(git config core.bare true)"

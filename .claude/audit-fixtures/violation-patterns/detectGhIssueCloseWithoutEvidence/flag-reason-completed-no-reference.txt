@@ -1,1 +1,0 @@
-gh issue close 1687 --reason completed --comment "all good"

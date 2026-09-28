@@ -1,1 +1,0 @@
-git config --system core.worktree /tmp/x

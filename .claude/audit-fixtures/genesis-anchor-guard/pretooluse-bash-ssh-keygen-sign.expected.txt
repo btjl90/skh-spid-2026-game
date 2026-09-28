@@ -1,1 +1,0 @@
-watched: tool=Bash command="ssh-keygen -Y sign ..." matches the sign-operation allowlist; the hook proceeds to verify the trust root.

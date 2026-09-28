@@ -1,3 +1,0 @@
-cat > /tmp/loom-1703-report.md <<EOF
-$(rm .claude/learning/posture.json)
-EOF

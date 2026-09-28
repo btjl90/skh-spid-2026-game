@@ -1,1 +1,0 @@
-ruby -e '%x<echo forged > .claude/learning/posture.json>'

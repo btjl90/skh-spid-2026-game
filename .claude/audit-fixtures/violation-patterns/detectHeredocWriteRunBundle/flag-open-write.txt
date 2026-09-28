@@ -1,4 +1,0 @@
-cat > s.py <<EOF
-open(".claude/learning/posture.json", "w").write("{}")
-EOF
-python3 s.py

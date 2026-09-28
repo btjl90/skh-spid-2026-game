@@ -1,1 +1,0 @@
-gh workflow run release.yml --repo terrene-foundation/kailash-rs --ref main

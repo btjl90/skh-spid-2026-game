@@ -1,1 +1,0 @@
-The higher-priority workstream lives in kailash-py — context-switch to kailash-py to address the open audit findings before continuing here.

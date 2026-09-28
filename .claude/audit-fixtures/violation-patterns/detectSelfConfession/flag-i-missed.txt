@@ -1,1 +1,0 @@
-I missed the integration test step earlier and should have verified the read-back before declaring the migration complete.

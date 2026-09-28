@@ -1,1 +1,0 @@
-EnterWorktree({path: "/Users/me/repos/.loom-wt/parallel-dev"})

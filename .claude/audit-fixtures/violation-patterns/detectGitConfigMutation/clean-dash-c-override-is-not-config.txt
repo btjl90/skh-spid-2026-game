@@ -1,1 +1,0 @@
-git -c core.hooksPath=/dev/null commit -q -m fixture

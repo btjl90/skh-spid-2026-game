@@ -1,1 +1,0 @@
-grep -rn 'gh issue close 42 --reason not_planned' .claude/hooks/

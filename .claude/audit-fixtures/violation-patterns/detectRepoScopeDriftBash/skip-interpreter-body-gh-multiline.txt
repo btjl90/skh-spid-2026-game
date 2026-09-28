@@ -1,3 +1,0 @@
-python3 -c "
-print('gh pr create --repo other-org/other-repo')
-"

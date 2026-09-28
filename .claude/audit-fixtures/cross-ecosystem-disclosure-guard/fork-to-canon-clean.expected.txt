@@ -1,1 +1,0 @@
-allow: fork-to-canon-clean (boundary=fork->canon, scan ran clean)

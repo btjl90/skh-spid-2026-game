@@ -1,1 +1,0 @@
-node -e "new Function('f','.claude/learning/posture.json')(require('fs'))"

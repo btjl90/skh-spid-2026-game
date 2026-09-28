@@ -1,1 +1,0 @@
-python3 -c "import subprocess;subprocess.run(['rm','.claude/learning/posture.json'])"

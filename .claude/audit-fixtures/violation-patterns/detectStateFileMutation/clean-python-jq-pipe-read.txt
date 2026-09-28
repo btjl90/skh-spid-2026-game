@@ -1,1 +1,0 @@
-python3 -c "import json,sys; json.load(open('.claude/learning/posture.json'))"

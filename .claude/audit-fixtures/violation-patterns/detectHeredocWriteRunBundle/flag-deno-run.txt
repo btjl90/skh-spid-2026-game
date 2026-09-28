@@ -1,4 +1,0 @@
-cat > s.js <<'EOF'
-require("fs").writeFileSync(".claude/learning/posture.json", "{}");
-EOF
-deno run -A s.js

@@ -1,3 +1,0 @@
-cat > /tmp/loom-1703-report.md <<'EOF'
-Also blocked: rm .claude/learning/posture.json
-EOF

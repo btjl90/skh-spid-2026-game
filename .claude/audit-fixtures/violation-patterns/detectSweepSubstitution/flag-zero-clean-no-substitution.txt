@@ -1,5 +1,0 @@
-Audit summary:
-
-Sweep 5: 0/0/0 (clean)
-
-All other sweeps green.

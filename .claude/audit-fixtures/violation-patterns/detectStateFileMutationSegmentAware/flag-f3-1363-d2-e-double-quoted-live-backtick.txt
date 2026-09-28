@@ -1,1 +1,0 @@
-gh issue create --title t --body "see `rm .claude/learning/posture.json` here"

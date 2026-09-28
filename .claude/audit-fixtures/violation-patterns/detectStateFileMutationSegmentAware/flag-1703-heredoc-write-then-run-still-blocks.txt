@@ -1,4 +1,0 @@
-cat > s1703.sh <<'EOF'
-rm .claude/learning/posture.json
-EOF
-bash s1703.sh

@@ -1,2 +1,0 @@
-node -e "console.log('ok')"
-node -e "require('fs').writeFileSync('.claude/learning/posture.json','{}')"

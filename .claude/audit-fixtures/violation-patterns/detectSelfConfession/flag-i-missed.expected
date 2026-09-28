@@ -1,5 +1,0 @@
-{
-  "rule_id": "test-completeness/PROVISIONAL",
-  "severity": "advisory",
-  "evidence_substring": "I missed"
-}

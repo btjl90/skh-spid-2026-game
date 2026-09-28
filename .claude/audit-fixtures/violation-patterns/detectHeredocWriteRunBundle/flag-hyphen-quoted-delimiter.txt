@@ -1,4 +1,0 @@
-cat > s.cjs <<'a-b'
-fs.writeFileSync(".claude/learning/posture.json", "{}");
-a-b
-node s.cjs

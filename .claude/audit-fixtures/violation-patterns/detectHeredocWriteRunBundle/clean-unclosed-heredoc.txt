@@ -1,2 +1,0 @@
-cat > s.cjs <<EOF
-require("fs").fs.writeFileSync(".claude/learning/posture.json", "{}");

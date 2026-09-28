@@ -1,1 +1,0 @@
-echo "gh issue close 42 --reason not_planned"

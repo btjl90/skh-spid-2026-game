@@ -1,5 +1,0 @@
-{
-  "rule_id": "worktree-isolation/MUST-1",
-  "severity": "block",
-  "evidence_substring": "outside pinned worktree"
-}

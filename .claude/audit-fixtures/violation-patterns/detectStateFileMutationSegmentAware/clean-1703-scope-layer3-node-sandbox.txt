@@ -1,1 +1,0 @@
-node -e "require('fs').writeFileSync('/tmp/loom-1703-sandbox/.claude/learning/posture.json','{}')"

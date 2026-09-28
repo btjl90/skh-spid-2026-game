@@ -1,1 +1,0 @@
-python3 -c "import json; print(json.load(open('.claude/learning/posture.json')).get('inplace'))"

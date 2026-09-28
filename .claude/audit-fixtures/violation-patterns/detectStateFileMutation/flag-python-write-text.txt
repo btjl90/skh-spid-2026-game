@@ -1,1 +1,0 @@
-python3 -c "import pathlib;pathlib.Path('.claude/learning/posture.json').write_text('{}')"

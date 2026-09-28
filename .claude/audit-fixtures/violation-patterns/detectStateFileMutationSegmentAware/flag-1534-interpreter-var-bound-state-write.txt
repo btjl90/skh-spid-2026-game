@@ -1,5 +1,0 @@
-python3 - <<'PY'
-import io
-p=".claude/learning/posture.json"
-io.open(p,"w").write("{}")
-PY
